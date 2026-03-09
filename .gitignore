@@ -1,1 +1,6 @@
 config/mjpg-twitter.conf
+__pycache__/
+*.jpg
+*.jpeg
+*.png
+bin/mjpg-rotated.sh

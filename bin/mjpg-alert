@@ -202,14 +202,7 @@ def main():
                 snap_count = 0
                 mode = get_current_mode()
             else:
-                # Night mode: keep snapping every 10 seconds
-                mode = get_current_mode()
-                if mode == "night" and time.time() - last_night_snap >= NIGHT_SNAP_INTERVAL:
-                    snap_count += 1
-                    ts_tweet = time.strftime("%H:%M:%S")
-                    last_night_snap = time.time()
-                    tweet_text = "DEFCON 2 - INCOMING MISSILES\n" + ts_tweet + " #" + str(snap_count) + ""
-                    post_tweet(tweet_text, mode)
+                pass
 
         if state == "clear" and clear_time and time.time() - clear_time > CLEAR_DISPLAY_SECS:
             set_display(idle="DEFCON 5")
