@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Auto day/night switching based on calculated sunrise/sunset for Tel Aviv."""
+
+import math
+import datetime
+import subprocess
+import sys
+
+# Tel Aviv coordinates
+LAT = 32.08
+LON = 34.78
+SWITCH_FILE = "/etc/mjpg-next-switch"
+OFFSET = 45  # minutes before sunrise/after sunset to switch
+
+def sun_times(date, lat, lon):
+    """Calculate sunrise and sunset times using the solar equations."""
+    day_of_year = date.timetuple().tm_yday
+    decl = 23.45 * math.sin(math.radians(360 / 365 * (day_of_year - 81)))
+    decl_rad = math.radians(decl)
+    lat_rad = math.radians(lat)
+    cos_ha = max(-1, min(1, -math.tan(lat_rad) * math.tan(decl_rad)))
+    ha = math.degrees(math.acos(cos_ha))
+    b = math.radians(360 / 365 * (day_of_year - 81))
+    eot = 9.87 * math.sin(2 * b) - 7.53 * math.cos(b) - 1.5 * math.sin(b)
+    solar_noon = 720 - 4 * lon - eot
+    sunrise_utc = solar_noon - ha * 4
+    sunset_utc = solar_noon + ha * 4
+    year = date.year
+    mar31 = datetime.date(year, 3, 31)
+    dst_start = mar31 - datetime.timedelta(days=(mar31.weekday() + 2) % 7)
+    oct31 = datetime.date(year, 10, 31)
+    dst_end = oct31 - datetime.timedelta(days=oct31.weekday())
+    tz_offset = 3 if dst_start <= date <= dst_end else 2
+    sunrise_min = sunrise_utc + tz_offset * 60
+    sunset_min = sunset_utc + tz_offset * 60
+    sunrise = datetime.time(int(sunrise_min // 60) % 24, int(sunrise_min % 60))
+    sunset = datetime.time(int(sunset_min // 60) % 24, int(sunset_min % 60))
+    return sunrise, sunset
+
+def get_current_mode():
+    try:
+        with open("/etc/mjpg-streamer.conf") as f:
+            for line in f:
+                if line.startswith("MODE="):
+                    return line.strip().split("=")[1].strip('"')
+    except FileNotFoundError:
+        pass
+    return "day"
+
+def write_next_switch(target, sunrise, sunset, today):
+    """Write next switch time to file for OSD display."""
+    now = datetime.datetime.now()
+    if target == "day":
+        # Currently day, next switch is to night at sunset+30min
+        next_time = datetime.datetime.combine(today, sunset) - datetime.timedelta(minutes=OFFSET)
+        next_label = f"night {next_time.strftime('%H:%M')}"
+    else:
+        # Currently night, next switch is to day at sunrise-30min
+        tomorrow = today + datetime.timedelta(days=1)
+        sr_tomorrow, _ = sun_times(tomorrow, LAT, LON)
+        next_time = datetime.datetime.combine(tomorrow, sr_tomorrow) + datetime.timedelta(minutes=OFFSET)
+        if now.time() < sunrise:
+            next_time = datetime.datetime.combine(today, sunrise) + datetime.timedelta(minutes=OFFSET)
+        next_label = f"day {next_time.strftime('%H:%M')}"
+    with open(SWITCH_FILE, "w") as f:
+        f.write(next_label)
+
+def main():
+    today = datetime.date.today()
+    now = datetime.datetime.now().time()
+    sunrise, sunset = sun_times(today, LAT, LON)
+    sunrise_adj = (datetime.datetime.combine(today, sunrise) + datetime.timedelta(minutes=OFFSET)).time()
+    sunset_adj = (datetime.datetime.combine(today, sunset) - datetime.timedelta(minutes=OFFSET)).time()
+
+    if sunrise_adj <= now <= sunset_adj:
+        target = "day"
+    else:
+        target = "night"
+
+    write_next_switch(target, sunrise, sunset, today)
+    current = get_current_mode()
+
+    if "--force" in sys.argv or current != target:
+        print(f"Sunrise: {sunrise.strftime('%H:%M')}, Sunset: {sunset.strftime('%H:%M')}")
+        print(f"Switching: {current} -> {target}")
+        subprocess.run(["/usr/local/bin/mjpg-ctl", target])
+    else:
+        if "--quiet" not in sys.argv:
+            print(f"Sunrise: {sunrise.strftime('%H:%M')}, Sunset: {sunset.strftime('%H:%M')}")
+            print(f"Already in {target} mode, no change needed")
+
+if __name__ == "__main__":
+    main()

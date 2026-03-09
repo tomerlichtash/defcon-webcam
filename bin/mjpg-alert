@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""Monitor Pikud HaOref alerts for Gush Dan."""
+
+import json
+import time
+import urllib.request
+import subprocess
+import sys
+import tweepy
+
+URL = "https://www.oref.org.il/warningMessages/alert/Alerts.json"
+WATCH_TERMS = ["גבעתיים", "רמת גן", "תל אביב", "בני ברק"]
+ALERT_FILE = "/tmp/mjpg-alert.txt"
+CLEAR_FILE = "/tmp/mjpg-clear.txt"
+IDLE_FILE = "/tmp/mjpg-idle.txt"
+SNAPSHOT_PATH = "/tmp/mjpg-tweet.jpg"
+TWITTER_CONF = "/etc/mjpg-twitter.conf"
+STREAMER_CONF = "/etc/mjpg-streamer.conf"
+STATE_FILE = "/tmp/mjpg-alert-state"
+CHECK_INTERVAL = 3
+CLEAR_DISPLAY_SECS = 300
+NIGHT_SNAP_INTERVAL = 10
+
+HEADERS = {
+    "X-Requested-With": "XMLHttpRequest",
+    "Referer": "https://www.oref.org.il/",
+    "User-Agent": "Mozilla/5.0"
+}
+
+state = "idle"
+last_matched = set()
+
+
+def get_current_mode():
+    try:
+        with open(STREAMER_CONF) as f:
+            for line in f:
+                if line.startswith("MODE="):
+                    return line.strip().split("=")[1].strip('"')
+    except Exception:
+        pass
+    return "day"
+
+
+def load_twitter_keys():
+    keys = {}
+    try:
+        with open(TWITTER_CONF) as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    keys[k.strip()] = v.strip().strip('"')
+    except Exception as e:
+        print("Failed to load Twitter config: " + str(e), flush=True)
+    return keys
+
+
+def take_alert_snapshot(mode):
+    if mode == "night":
+        subprocess.run(["v4l2-ctl", "--device=/dev/video0",
+            "--set-ctrl=auto_exposure=1",
+            "--set-ctrl=exposure_time_absolute=2047",
+            "--set-ctrl=gain=0"], timeout=5)
+        time.sleep(3)
+
+    subprocess.run(["curl", "-s", "-o", SNAPSHOT_PATH, "--max-time", "10",
+        "http://localhost:8080/?action=snapshot"], timeout=15)
+
+    if mode == "night":
+        subprocess.run(["v4l2-ctl", "--device=/dev/video0",
+            "--set-ctrl=auto_exposure=3",
+            "--set-ctrl=gain=255"], timeout=5)
+
+
+def post_tweet(text, mode):
+    try:
+        take_alert_snapshot(mode)
+
+        keys = load_twitter_keys()
+        if not keys:
+            print("No Twitter keys, skipping tweet", flush=True)
+            return
+
+        auth = tweepy.OAuth1UserHandler(
+            keys["API_KEY"], keys["API_SECRET"],
+            keys["ACCESS_TOKEN"], keys["ACCESS_SECRET"]
+        )
+        api = tweepy.API(auth)
+        media = api.media_upload(SNAPSHOT_PATH)
+
+        client = tweepy.Client(
+            consumer_key=keys["API_KEY"], consumer_secret=keys["API_SECRET"],
+            access_token=keys["ACCESS_TOKEN"], access_token_secret=keys["ACCESS_SECRET"]
+        )
+        client.create_tweet(text=text, media_ids=[media.media_id])
+        print("Tweet posted: " + text, flush=True)
+
+    except Exception as e:
+        print("Tweet failed: " + str(e), flush=True)
+
+
+def check_alerts():
+    global last_matched
+    try:
+        req = urllib.request.Request(URL, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            raw = resp.read().decode("utf-8-sig").strip()
+            if not raw:
+                return None
+            data = json.loads(raw)
+            cities = data.get("data", [])
+            title = data.get("title", "")
+            matched = [c for c in cities if any(t in c for t in WATCH_TERMS)]
+            if matched:
+                last_matched = matched
+                if title == "האירוע הסתיים":
+                    return "clear"
+                else:
+                    return "alert"
+    except Exception as e:
+        if "--verbose" in sys.argv:
+            print("Error: " + str(e), flush=True)
+    return None
+
+
+def set_display(idle=" ", alert=" ", clear=" "):
+    for path, text in [(IDLE_FILE, idle), (ALERT_FILE, alert), (CLEAR_FILE, clear)]:
+        try:
+            with open(path, "w") as f:
+                f.write(text)
+        except Exception:
+            pass
+
+
+def save_state(s):
+    try:
+        with open(STATE_FILE, "w") as f:
+            f.write(s)
+    except Exception:
+        pass
+
+def load_state():
+    try:
+        with open(STATE_FILE) as f:
+            return f.read().strip()
+    except Exception:
+        return "idle"
+
+def main():
+    global state
+    term_count = len(WATCH_TERMS)
+    print("Monitoring alerts for Gush Dan (" + str(term_count) + " terms)...", flush=True)
+    clear_time = 0
+    last_night_snap = 0
+    snap_count = 0
+
+    # Restore persisted state
+    state = load_state()
+    if state == "alert":
+        ts = time.strftime("%H.%M.%S")
+        set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
+        print("Resuming in DEFCON 2 (persisted state)", flush=True)
+    elif state == "clear":
+        ts = time.strftime("%H.%M.%S")
+        set_display(clear="ALL CLEAR - " + ts)
+        clear_time = time.time()
+        print("Resuming in ALL CLEAR (persisted state)", flush=True)
+    else:
+        set_display(idle="DEFCON 5")
+        print("Starting in DEFCON 5", flush=True)
+
+    while True:
+        result = check_alerts()
+
+        if state == "idle" or state == "clear":
+            if result == "alert":
+                ts = time.strftime("%H.%M.%S")
+                ts_tweet = time.strftime("%H:%M:%S")
+                set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
+                print("ALERT: " + ts, flush=True)
+                state = "alert"
+                save_state("alert")
+                clear_time = 0
+                snap_count = 1
+                last_night_snap = time.time()
+                mode = get_current_mode()
+                tweet_text = "DEFCON 2 - INCOMING MISSILES\n" + ts_tweet
+                time.sleep(3)  # wait for OSD overlay to update
+                post_tweet(tweet_text, mode)
+
+        elif state == "alert":
+            if result == "clear":
+                ts = time.strftime("%H.%M.%S")
+                ts_tweet = time.strftime("%H:%M:%S")
+                set_display(clear="ALL CLEAR - " + ts)
+                print("ALL CLEAR: " + ts, flush=True)
+                state = "clear"
+                save_state("clear")
+                clear_time = time.time()
+                last_night_snap = 0
+                snap_count = 0
+                mode = get_current_mode()
+            else:
+                # Night mode: keep snapping every 10 seconds
+                mode = get_current_mode()
+                if mode == "night" and time.time() - last_night_snap >= NIGHT_SNAP_INTERVAL:
+                    snap_count += 1
+                    ts_tweet = time.strftime("%H:%M:%S")
+                    last_night_snap = time.time()
+                    tweet_text = "DEFCON 2 - INCOMING MISSILES\n" + ts_tweet + " #" + str(snap_count) + ""
+                    post_tweet(tweet_text, mode)
+
+        if state == "clear" and clear_time and time.time() - clear_time > CLEAR_DISPLAY_SECS:
+            set_display(idle="DEFCON 5")
+            state = "idle"
+            save_state("idle")
+            clear_time = 0
+            print("Back to idle", flush=True)
+            mode = get_current_mode()
+            ts_tweet = time.strftime("%H:%M:%S")
+
+        time.sleep(CHECK_INTERVAL)
+
+
+if __name__ == "__main__":
+    main()
