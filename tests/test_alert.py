@@ -19,7 +19,8 @@ sys.modules["tweepy"] = MagicMock()
 from lib import config, state, oref
 from lib.state import save_state, load_state, set_display
 from lib.oref import _fetch_url, _classify_alert, check_alerts
-from lib.config import get_current_mode, load_twitter_keys
+from lib.config import get_current_mode, load_twitter_keys, load_telegram_keys
+from lib.telegram import post_telegram
 
 
 class TestClassifyAlert(unittest.TestCase):
@@ -548,6 +549,151 @@ class TestStateResume(unittest.TestCase):
         loaded = load_state()
         self.assertNotIn(loaded, ("defcon2", "defcon4"))
 
+
+
+class TestLoadTelegramKeys(unittest.TestCase):
+    """Test load_telegram_keys() config parsing."""
+
+    def setUp(self):
+        self.tmpfile = tempfile.NamedTemporaryFile(mode='w', suffix='.conf', delete=False)
+        self._orig = config.TELEGRAM_CONF
+        config.TELEGRAM_CONF = self.tmpfile.name
+
+    def tearDown(self):
+        config.TELEGRAM_CONF = self._orig
+        os.unlink(self.tmpfile.name)
+
+    def test_parses_bot_token_and_chat_id(self):
+        self.tmpfile.write('BOT_TOKEN=123456:ABC\nCHAT_ID=-100999\n')
+        self.tmpfile.flush()
+        keys = load_telegram_keys()
+        self.assertEqual(keys['BOT_TOKEN'], '123456:ABC')
+        self.assertEqual(keys['CHAT_ID'], '-100999')
+
+    def test_ignores_comments(self):
+        self.tmpfile.write('# comment\nBOT_TOKEN=abc\n')
+        self.tmpfile.flush()
+        keys = load_telegram_keys()
+        self.assertEqual(keys['BOT_TOKEN'], 'abc')
+        self.assertNotIn('#', str(keys))
+
+    def test_strips_quotes(self):
+        self.tmpfile.write('BOT_TOKEN="abc123"\nCHAT_ID="-100"\n')
+        self.tmpfile.flush()
+        keys = load_telegram_keys()
+        self.assertEqual(keys['BOT_TOKEN'], 'abc123')
+        self.assertEqual(keys['CHAT_ID'], '-100')
+
+    @patch('builtins.print')
+    def test_missing_file_returns_empty(self, _):
+        config.TELEGRAM_CONF = '/nonexistent/telegram.conf'
+        keys = load_telegram_keys()
+        self.assertEqual(keys, {})
+
+    def test_empty_file_returns_empty(self):
+        self.tmpfile.write('')
+        self.tmpfile.flush()
+        keys = load_telegram_keys()
+        self.assertEqual(keys, {})
+
+
+class TestPostTelegram(unittest.TestCase):
+    """Test post_telegram() — Telegram Bot API integration."""
+
+    def setUp(self):
+        self.tmpconf = tempfile.NamedTemporaryFile(mode='w', suffix='.conf', delete=False)
+        self.tmpsnap = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+        self._orig_conf = config.TELEGRAM_CONF
+        self._orig_snap = config.SNAPSHOT_PATH
+        config.TELEGRAM_CONF = self.tmpconf.name
+        config.SNAPSHOT_PATH = self.tmpsnap.name
+        self.tmpsnap.write(b'\xff\xd8\xff\xe0fake_jpeg_data')
+        self.tmpsnap.flush()
+
+    def tearDown(self):
+        config.TELEGRAM_CONF = self._orig_conf
+        config.SNAPSHOT_PATH = self._orig_snap
+        os.unlink(self.tmpconf.name)
+        os.unlink(self.tmpsnap.name)
+
+    @patch('lib.telegram.take_alert_snapshot')
+    @patch('lib.telegram.urllib.request.urlopen')
+    @patch('builtins.print')
+    def test_sends_photo_with_caption(self, mock_print, mock_urlopen, mock_snap):
+        self.tmpconf.write('BOT_TOKEN=123:ABC\nCHAT_ID=-100\n')
+        self.tmpconf.flush()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"ok": true}'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        post_telegram('DEFCON 2 - TEST', 'day')
+
+        mock_snap.assert_called_once_with('day')
+        mock_urlopen.assert_called_once()
+        req = mock_urlopen.call_args[0][0]
+        self.assertIn('123:ABC', req.full_url)
+        self.assertIn(b'DEFCON 2 - TEST', req.data)
+        self.assertIn(b'fake_jpeg_data', req.data)
+
+    @patch('lib.telegram.take_alert_snapshot')
+    @patch('builtins.print')
+    def test_skips_when_no_config(self, mock_print, mock_snap):
+        config.TELEGRAM_CONF = '/nonexistent/conf'
+        post_telegram('test', 'day')
+        mock_snap.assert_called_once()
+        mock_print.assert_any_call('No Telegram keys, skipping message', flush=True)
+
+    @patch('lib.telegram.take_alert_snapshot')
+    @patch('builtins.print')
+    def test_skips_when_config_incomplete(self, mock_print, mock_snap):
+        self.tmpconf.write('BOT_TOKEN=123\n')
+        self.tmpconf.flush()
+        post_telegram('test', 'day')
+        mock_print.assert_any_call('Telegram config incomplete, skipping', flush=True)
+
+    @patch('lib.telegram.take_alert_snapshot')
+    @patch('lib.telegram.urllib.request.urlopen')
+    @patch('builtins.print')
+    def test_handles_api_error(self, mock_print, mock_urlopen, mock_snap):
+        self.tmpconf.write('BOT_TOKEN=123:ABC\nCHAT_ID=-100\n')
+        self.tmpconf.flush()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"ok": false, "description": "bad"}'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        post_telegram('test', 'day')
+        printed = [str(c) for c in mock_print.call_args_list]
+        self.assertTrue(any('Telegram API error' in p for p in printed))
+
+    @patch('lib.telegram.take_alert_snapshot')
+    @patch('lib.telegram.urllib.request.urlopen', side_effect=Exception('network error'))
+    @patch('builtins.print')
+    def test_handles_network_error(self, mock_print, mock_urlopen, mock_snap):
+        self.tmpconf.write('BOT_TOKEN=123:ABC\nCHAT_ID=-100\n')
+        self.tmpconf.flush()
+
+        post_telegram('test', 'day')
+        printed = [str(c) for c in mock_print.call_args_list]
+        self.assertTrue(any('Telegram failed' in p for p in printed))
+
+    @patch('lib.telegram.take_alert_snapshot')
+    @patch('lib.telegram.urllib.request.urlopen')
+    @patch('builtins.print')
+    def test_night_mode_passed_to_snapshot(self, mock_print, mock_urlopen, mock_snap):
+        self.tmpconf.write('BOT_TOKEN=123:ABC\nCHAT_ID=-100\n')
+        self.tmpconf.flush()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"ok": true}'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        post_telegram('test', 'night')
+        mock_snap.assert_called_once_with('night')
 
 if __name__ == "__main__":
     unittest.main()

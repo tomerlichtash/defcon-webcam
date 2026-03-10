@@ -6,6 +6,7 @@ IDLE_FILE = "/tmp/mjpg-idle.txt"
 DEFCON4_FILE = "/tmp/mjpg-clear.txt"
 SNAPSHOT_PATH = "/tmp/mjpg-tweet.jpg"
 TWITTER_CONF = "/etc/mjpg-twitter.conf"
+TELEGRAM_CONF = "/etc/mjpg-telegram.conf"
 STREAMER_CONF = "/etc/mjpg-streamer.conf"
 STATE_FILE = "/tmp/mjpg-alert-state"
 CHECK_INTERVAL = 3
@@ -41,4 +42,19 @@ def load_twitter_keys():
                     keys[k.strip()] = v.strip().strip('"')
     except Exception as e:
         print("Failed to load Twitter config: " + str(e), flush=True)
+    return keys
+
+
+def load_telegram_keys():
+    """Parse Telegram bot keys from config file."""
+    keys = {}
+    try:
+        with open(TELEGRAM_CONF) as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    keys[k.strip()] = v.strip().strip('"')
+    except Exception as e:
+        print("Failed to load Telegram config: " + str(e), flush=True)
     return keys

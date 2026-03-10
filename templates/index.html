@@ -34,6 +34,10 @@
   .slider-row label { min-width: 55px; font-size: 0.82em; }
   .slider-row input[type=range] { flex: 1; accent-color: #e94560; }
   .slider-row .val { min-width: 30px; text-align: right; font-size: 0.82em; color: #e94560; }
+  .cb-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 0.85em; }
+  .cb-row input[type=checkbox] { accent-color: #e94560; width: 16px; height: 16px; }
+  .cb-row label { cursor: pointer; }
+  .publish-status { font-size: 0.8em; color: #888; margin-top: 6px; min-height: 18px; }
   @media (max-width: 800px) {
     .main-layout { flex-direction: column; }
     .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; }
@@ -120,6 +124,21 @@
           <button class="btn" id="cam-toggle" onclick="camToggle()">...</button>
           <button class="btn" onclick="camCtl('restart')">Restart</button>
         </div>
+      </div>
+      <div class="panel">
+        <h3>Publish</h3>
+        <div class="cb-row">
+          <input type="checkbox" id="pub-telegram" checked>
+          <label for="pub-telegram">Telegram</label>
+        </div>
+        <div class="cb-row">
+          <input type="checkbox" id="pub-twitter">
+          <label for="pub-twitter">Twitter</label>
+        </div>
+        <div style="margin-top: 8px;">
+          <button class="btn" onclick="publish()">Publish Snapshot</button>
+        </div>
+        <div class="publish-status" id="pub-status"></div>
       </div>
       <div class="panel">
         <h3>Server</h3>
@@ -275,12 +294,40 @@ function loadSysInfo() {
     .catch(function() {});
 }
 
+
+function publish() {
+  var targets = [];
+  if (document.getElementById('pub-telegram').checked) targets.push('telegram');
+  if (document.getElementById('pub-twitter').checked) targets.push('twitter');
+  if (targets.length === 0) {
+    document.getElementById('pub-status').textContent = 'Select at least one target';
+    return;
+  }
+  var statusEl = document.getElementById('pub-status');
+  statusEl.textContent = 'Publishing to ' + targets.join(', ') + '...';
+  fetch('/api/publish', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({targets: targets, caption: 'Stars Outside'})
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var results = d.results || {};
+      var parts = [];
+      Object.keys(results).forEach(function(k) {
+        parts.push(k + ': ' + results[k]);
+      });
+      statusEl.textContent = parts.join(', ') || 'Done';
+    })
+    .catch(function(e) { statusEl.textContent = 'Error: ' + e; });
+}
+
 fetch('/api?cmd=status')
   .then(function(r) { return r.json(); })
   .then(function(d) { applyStatus(d.output); });
 
 loadSysInfo();
-setInterval(loadSysInfo, 30000);
+setInterval(loadSysInfo, 5000);
 </script>
 </body>
 </html>

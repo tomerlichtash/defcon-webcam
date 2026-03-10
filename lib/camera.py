@@ -3,7 +3,13 @@
 import subprocess
 import time
 
-from lib.config import SNAPSHOT_PATH
+from lib import config
+
+
+def take_snapshot():
+    """Take a snapshot using current camera settings."""
+    subprocess.run(["curl", "-s", "-o", config.SNAPSHOT_PATH, "--max-time", "10",
+        "http://localhost:8080/?action=snapshot"], timeout=15)
 
 
 def take_alert_snapshot(mode):
@@ -15,8 +21,7 @@ def take_alert_snapshot(mode):
             "--set-ctrl=gain=0"], timeout=5)
         time.sleep(3)
 
-    subprocess.run(["curl", "-s", "-o", SNAPSHOT_PATH, "--max-time", "10",
-        "http://localhost:8080/?action=snapshot"], timeout=15)
+    take_snapshot()
 
     if mode == "night":
         subprocess.run(["v4l2-ctl", "--device=/dev/video0",
