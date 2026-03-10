@@ -70,7 +70,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if os.path.isfile(fpath):
                 ext = os.path.splitext(fpath)[1]
                 ctypes = {'.ttf': 'font/ttf', '.woff2': 'font/woff2',
-                          '.css': 'text/css', '.html': 'text/html'}
+                          '.css': 'text/css', '.js': 'application/javascript', '.html': 'text/html'}
                 self.send_response(200)
                 self.send_header('Content-Type', ctypes.get(ext, 'application/octet-stream'))
                 self.send_header('Cache-Control', 'public, max-age=86400')
@@ -83,7 +83,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         else:
             host = self.headers.get('Host', '10.0.0.238:8081').split(':')[0]
             self.send_response(200)
-            self.send_header('Content-Type', 'text/html')
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.end_headers()
             self.wfile.write(HTML_TEMPLATE.replace('__HOST__', host).encode())
 

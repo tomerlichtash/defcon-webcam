@@ -2,6 +2,7 @@
 """Monitor Pikud HaOref alerts for Gush Dan."""
 
 import os
+import subprocess
 import sys
 import time
 
@@ -15,6 +16,21 @@ from lib.oref import check_alerts
 from lib.twitter import post_tweet
 from lib.telegram import post_telegram
 
+CTL = "/usr/local/bin/mjpg-ctl"
+
+
+def apply_camera_profile(profile):
+    """Switch camera between resting and alert profiles."""
+    if profile == "rest":
+        print("Resting mode: stopping camera", flush=True)
+        subprocess.run(["sudo", "systemctl", "stop", "mjpg-streamer"], timeout=15)
+    elif profile == "alert":
+        print("Alert mode: starting camera (720p, 24fps)", flush=True)
+        subprocess.run(["sudo", "systemctl", "start", "mjpg-streamer"], timeout=15)
+        time.sleep(3)
+        subprocess.run([CTL, "res", "mid"], timeout=30)
+        subprocess.run([CTL, "fps", "24"], timeout=30)
+
 
 def main():
     term_count = len(WATCH_TERMS)
@@ -25,14 +41,17 @@ def main():
     if state_mod.state == "defcon2":
         ts = time.strftime("%H:%M:%S")
         set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
+        apply_camera_profile("alert")
         print("Resuming in DEFCON 2 (persisted state)", flush=True)
     elif state_mod.state == "defcon4":
         ts = time.strftime("%H:%M:%S")
         set_display(defcon4="DEFCON 4 - ALERT INCOMING - " + ts)
+        apply_camera_profile("alert")
         print("Resuming in DEFCON 4 (persisted state)", flush=True)
     else:
         state_mod.state = "idle"
-        set_display(idle="DEFCON 5")
+        set_display(idle="DEFCON 5 -- CLEAR SKIES")
+        apply_camera_profile("rest")
         print("Starting in DEFCON 5", flush=True)
 
     while True:
@@ -44,7 +63,8 @@ def main():
                 print("Event ended at " + ts + ", back to DEFCON 5", flush=True)
                 state_mod.state = "idle"
                 save_state("idle")
-                set_display(idle="DEFCON 5")
+                set_display(idle="DEFCON 5 -- CLEAR SKIES")
+                apply_camera_profile("rest")
 
         elif result == "preemptive":
             if state_mod.state == "idle":
@@ -53,15 +73,19 @@ def main():
                 state_mod.state = "defcon4"
                 save_state("defcon4")
                 set_display(defcon4="DEFCON 4 - ALERT INCOMING - " + ts)
+                apply_camera_profile("alert")
 
         elif result == "actual":
             if state_mod.state in ("idle", "defcon4"):
+                prev = state_mod.state
                 ts = time.strftime("%H:%M:%S")
                 ts_tweet = time.strftime("%H:%M:%S")
                 print("DEFCON 2: incoming missiles - " + ts, flush=True)
                 state_mod.state = "defcon2"
                 save_state("defcon2")
                 set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
+                if prev == "idle":
+                    apply_camera_profile("alert")
                 tweet_text = "DEFCON 2 - INCOMING MISSILES\n" + ts_tweet
                 mode = get_current_mode()
                 tweet_cancelled = False
@@ -72,7 +96,8 @@ def main():
                         print("State changed during tweet delay, cancelling tweet", flush=True)
                         state_mod.state = "idle"
                         save_state("idle")
-                        set_display(idle="DEFCON 5")
+                        set_display(idle="DEFCON 5 -- CLEAR SKIES")
+                        apply_camera_profile("rest")
                         tweet_cancelled = True
                         break
                 if not tweet_cancelled and state_mod.state == "defcon2":

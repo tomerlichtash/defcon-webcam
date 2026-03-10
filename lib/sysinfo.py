@@ -10,7 +10,7 @@ def get_sysinfo():
     info = {}
 
     services = {}
-    for svc in ["mjpg-streamer", "mjpg-alert"]:
+    for svc in ["mjpg-alert", "mjpg-streamer"]:
         try:
             r = subprocess.run(["systemctl", "is-active", svc],
                                capture_output=True, text=True, timeout=5)

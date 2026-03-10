@@ -2,7 +2,7 @@
 CONF="/etc/mjpg-streamer.conf"
 SERVICE="mjpg-streamer"
 LAUNCHER="/usr/local/bin/mjpg-rotated.sh"
-FONT="/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
+FONT="/home/tomer/defcon-cam/static/fonts/Exo2-Bold.ttf"
 SWITCH_FILE="/etc/mjpg-next-switch"
 
 # Load current config or defaults
@@ -98,6 +98,14 @@ apply() {
     NEXT_SWITCH=" | next $(cat $SWITCH_FILE | tr ":" ".")"
   fi
 
+    # Scale font sizes proportionally to resolution height (base: 720p)
+    local HEIGHT=$(echo $VIDEO_SIZE | cut -d'x' -f2)
+    local FS_DEFCON=$((28 * HEIGHT / 720)); [ "$FS_DEFCON" -lt 18 ] && FS_DEFCON=18
+    local FS_TIME=$((14 * HEIGHT / 720)); [ "$FS_TIME" -lt 10 ] && FS_TIME=10
+    local FS_OSD=$((12 * HEIGHT / 720)); [ "$FS_OSD" -lt 10 ] && FS_OSD=10
+    local BW_DEFCON=$((2 * HEIGHT / 720))
+    [ "$BW_DEFCON" -lt 1 ] && BW_DEFCON=1
+
     local OSD="${MODE} | ${RES} ${VIDEO_SIZE} | rot ${ROTATE} | ${FPS}fps | bright ${BRIGHT}%${NEXT_SWITCH}"
   echo "$OSD" > /tmp/mjpg-osd.txt
 
@@ -113,7 +121,7 @@ $V4L2_CMD
 
 ffmpeg -f v4l2 -input_format mjpeg -video_size $VIDEO_SIZE -framerate $FPS \\
   -i /dev/video0 \\
-  -vf "${ROT_FILTER}${EQ_FILTER}drawtext=textfile=/tmp/mjpg-osd.txt:reload=1:fontfile=${FONT}:fontsize=12:fontcolor=white:borderw=2:bordercolor=black:x=10:y=h-30,drawtext=textfile=/tmp/mjpg-idle.txt:reload=1:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf:fontsize=28:fontcolor=0x4488FF:borderw=2:bordercolor=black:x=10:y=10,drawtext=textfile=/tmp/mjpg-alert.txt:reload=1:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf:fontsize=28:fontcolor=red:borderw=2:bordercolor=black:x=10:y=10,drawtext=textfile=/tmp/mjpg-clear.txt:reload=1:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf:fontsize=28:fontcolor=green:borderw=2:bordercolor=black:x=10:y=10,drawtext=text='%{localtime}':fontfile=${FONT}:fontsize=14:fontcolor=white:borderw=1:bordercolor=black:x=w-tw-10:y=h-30" \\
+  -vf "${ROT_FILTER}${EQ_FILTER}drawtext=textfile=/tmp/mjpg-osd.txt:reload=1:fontfile=${FONT}:fontsize=${FS_OSD}:fontcolor=white:borderw=1:bordercolor=black:x=10:y=h-30,drawtext=textfile=/tmp/mjpg-idle.txt:reload=1:fontfile=${FONT}:fontsize=${FS_DEFCON}:fontcolor=0x4488FF:borderw=${BW_DEFCON}:bordercolor=black:x=10:y=10,drawtext=textfile=/tmp/mjpg-alert.txt:reload=1:fontfile=${FONT}:fontsize=${FS_DEFCON}:fontcolor=red:borderw=${BW_DEFCON}:bordercolor=black:x=10:y=10,drawtext=textfile=/tmp/mjpg-clear.txt:reload=1:fontfile=${FONT}:fontsize=${FS_DEFCON}:fontcolor=green:borderw=${BW_DEFCON}:bordercolor=black:x=10:y=10,drawtext=text='%{localtime}':fontfile=${FONT}:fontsize=${FS_TIME}:fontcolor=white:borderw=1:bordercolor=black:x=w-tw-10:y=h-30" \\
   -update 1 -atomic_writing 1 -q:v 3 \\
   "\$TMPDIR/snap.jpg" &
 FFPID=\$!
