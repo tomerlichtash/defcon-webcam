@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Stars Outside - Camera Control Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @font-face { font-family: 'Exo 2'; font-weight: 400; src: url(/static/fonts/Exo2-Regular.ttf) format('truetype'); }
+  @font-face { font-family: 'Exo 2'; font-weight: 700; src: url(/static/fonts/Exo2-Bold.ttf) format('truetype'); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Exo 2', -apple-system, sans-serif; background: #1a1a2e; color: #eee; }
+  .container { max-width: 1600px; margin: 0 auto; padding: 10px; }
+  .status-bar { display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+                 background: #16213e; border-radius: 8px; padding: 8px 16px; margin-bottom: 10px;
+                 font-size: 0.85em; color: #aaa; }
+  .status-bar .title { color: #e94560; font-size: 1.3em; font-weight: bold; margin-right: auto; text-transform: uppercase; }
+  .status-bar .item { white-space: nowrap; }
+  .defcon-panel { text-align: center; font-size: 1.1em; font-weight: bold; }
+  .svc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .svc-dot.up { background: #4ecca3; }
+  .svc-dot.down { background: #e94560; }
+  .main-layout { display: flex; gap: 15px; }
+  .stream-area { flex: 1; min-width: 0; }
+  .stream-area img { width: 100%; border-radius: 8px; border: 2px solid #333; display: block; }
+  #status { text-align: center; color: #888; font-size: 0.85em; margin-top: 8px; min-height: 20px; }
+  .sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+  .panel { background: #16213e; border-radius: 8px; padding: 15px; }
+  .panel h3 { color: #e94560; margin-bottom: 8px; font-size: 0.85em; text-transform: uppercase; }
+  .btn-group { display: flex; gap: 5px; flex-wrap: wrap; }
+  .btn { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer;
+         background: #0f3460; color: #eee; font-size: 0.82em; transition: background 0.2s; }
+  .btn:hover { background: #e94560; }
+  .btn.active { background: #e94560; }
+  .slider-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .slider-row label { min-width: 55px; font-size: 0.82em; }
+  .slider-row input[type=range] { flex: 1; accent-color: #e94560; }
+  .slider-row .val { min-width: 30px; text-align: right; font-size: 0.82em; color: #e94560; }
+  @media (max-width: 800px) {
+    .main-layout { flex-direction: column; }
+    .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; }
+    .sidebar .panel { flex: 1 1 140px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="status-bar" id="status-bar">
+    <span class="title">Stars Outside</span>
+    <span class="item" id="sb-uptime">Uptime: ...</span>
+    <span class="item" id="sb-load">Load: ...</span>
+    <span class="item" id="sb-temp">Temp: ...</span>
+    <span class="item" id="sb-services">Services: ...</span>
+  </div>
+  <div class="main-layout">
+    <div class="stream-area">
+      <img id="stream" src="http://__HOST__:8080/?action=stream" alt="Camera Stream">
+      <div id="status"></div>
+    </div>
+    <div class="sidebar">
+      <div class="panel">
+        <div class="defcon-panel" id="defcon-state">DEFCON 5</div>
+      </div>
+      <div class="panel">
+        <h3>Mode</h3>
+        <div class="btn-group" data-group="mode">
+          <button class="btn" data-val="day" onclick="cmd('day')">Day</button>
+          <button class="btn" data-val="night" onclick="cmd('night')">Night</button>
+          <button class="btn" data-val="indoor" onclick="cmd('indoor')">Indoor</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Resolution</h3>
+        <div class="btn-group" data-group="res">
+          <button class="btn" data-val="low" onclick="cmd('res low')">480p</button>
+          <button class="btn" data-val="mid" onclick="cmd('res mid')">720p</button>
+          <button class="btn" data-val="high" onclick="cmd('res high')">1080p</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Rotation</h3>
+        <div class="btn-group" data-group="rotation">
+          <button class="btn" data-val="0" onclick="cmd('rotate 0')">0&deg;</button>
+          <button class="btn" data-val="90" onclick="cmd('rotate 90')">90&deg;</button>
+          <button class="btn" data-val="180" onclick="cmd('rotate 180')">180&deg;</button>
+          <button class="btn" data-val="270" onclick="cmd('rotate 270')">270&deg;</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>FPS</h3>
+        <div class="btn-group" data-group="fps">
+          <button class="btn" data-val="5" onclick="cmd('fps 5')">5</button>
+          <button class="btn" data-val="10" onclick="cmd('fps 10')">10</button>
+          <button class="btn" data-val="15" onclick="cmd('fps 15')">15</button>
+          <button class="btn" data-val="24" onclick="cmd('fps 24')">24</button>
+          <button class="btn" data-val="30" onclick="cmd('fps 30')">30</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Brightness</h3>
+        <div class="slider-row">
+          <label>Level</label>
+          <input type="range" id="bright" min="0" max="100" value="58" oninput="sliderUpdate('bright',this.value)" onchange="cmd('bright '+this.value)">
+          <span class="val" id="bright-val">58</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Zoom</h3>
+        <div class="slider-row">
+          <label>Level</label>
+          <input type="range" id="zoom" min="100" max="500" value="100" step="10" oninput="sliderUpdate('zoom',this.value)" onchange="cmd('zoom '+this.value)">
+          <span class="val" id="zoom-val">100</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Focus</h3>
+        <div><button class="btn" onclick="cmd('focus')">Refocus</button></div>
+      </div>
+      <div class="panel">
+        <h3>Camera</h3>
+        <div class="btn-group">
+          <button class="btn" id="cam-toggle" onclick="camToggle()">...</button>
+          <button class="btn" onclick="camCtl('restart')">Restart</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Server</h3>
+        <div class="btn-group">
+          <button class="btn" onclick="restartServer()">Restart Web UI</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function setActive(group, val) {
+  var grp = document.querySelector('[data-group="' + group + '"]');
+  if (!grp) return;
+  grp.querySelectorAll('.btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-val') === val);
+  });
+}
+
+function applyStatus(output) {
+  var lines = output.split('\n');
+  lines.forEach(function(l) {
+    var m;
+    if (m = l.match(/Mode: (\w+)/)) setActive('mode', m[1]);
+    if (m = l.match(/Resolution: (\w+)/)) setActive('res', m[1]);
+    if (m = l.match(/Rotation: (\d+)/)) setActive('rotation', m[1]);
+    if (m = l.match(/Brightness: (\d+)/)) {
+      document.getElementById('bright').value = m[1];
+      sliderUpdate('bright', m[1]);
+    }
+    if (m = l.match(/FPS: (\d+)/)) setActive('fps', m[1]);
+    if (m = l.match(/Zoom: (\d+)/)) {
+      document.getElementById('zoom').value = m[1];
+      sliderUpdate('zoom', m[1]);
+    }
+  });
+}
+
+function cmdToGroup(c) {
+  if (c === 'day' || c === 'night' || c === 'indoor') return {group: 'mode', val: c};
+  var m;
+  if (m = c.match(/^res (\w+)/)) return {group: 'res', val: m[1]};
+  if (m = c.match(/^rotate (\d+)/)) return {group: 'rotation', val: m[1]};
+  if (m = c.match(/^fps (\d+)/)) return {group: 'fps', val: m[1]};
+  return null;
+}
+
+function cmd(c) {
+  document.getElementById('status').textContent = 'Applying: ' + c + '...';
+  fetch('/api?cmd=' + encodeURIComponent(c))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('status').textContent = d.output || 'Done';
+      var g = cmdToGroup(c);
+      if (g) setActive(g.group, g.val);
+      if (c.startsWith('res ') || c.startsWith('rotate ') || c.startsWith('fps ') || c === 'day' || c === 'night' || c === 'indoor') {
+        countdown(5);
+      }
+    })
+    .catch(function(e) { document.getElementById('status').textContent = 'Error: ' + e; });
+}
+
+function countdown(sec) {
+  var el = document.getElementById('status');
+  var left = sec;
+  var iv = setInterval(function() {
+    el.textContent = 'Refreshing stream in ' + left + 's...';
+    left--;
+    if (left < 0) {
+      clearInterval(iv);
+      el.textContent = '';
+      var img = document.getElementById('stream');
+      img.src = img.src.split('?')[0] + '?action=stream&t=' + Date.now();
+    }
+  }, 1000);
+}
+
+function sliderUpdate(id, val) {
+  document.getElementById(id + '-val').textContent = val;
+}
+
+var camOn = false;
+
+function updateCamBtn() {
+  var btn = document.getElementById('cam-toggle');
+  btn.textContent = camOn ? 'On' : 'Off';
+  btn.classList.toggle('active', camOn);
+}
+
+function camCtl(action) {
+  document.getElementById('status').textContent = 'Camera: ' + action + '...';
+  fetch('/api?cmd=camctl+' + action)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('status').textContent = d.output || 'Done';
+      loadSysInfo();
+      if (action !== 'stop') {
+        countdown(3);
+      }
+    })
+    .catch(function(e) { document.getElementById('status').textContent = 'Error: ' + e; });
+}
+
+function restartServer() {
+  document.getElementById('status').textContent = 'Restarting web server...';
+  fetch('/api?cmd=restart-web').catch(function() {});
+  setTimeout(function() { location.reload(); }, 3000);
+}
+
+function camToggle() {
+  camCtl(camOn ? 'stop' : 'start');
+}
+
+function dot(active) {
+  return '<span class="svc-dot ' + (active ? 'up' : 'down') + '"></span>';
+}
+
+function loadSysInfo() {
+  fetch('/api?cmd=sysinfo')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var info = d.sysinfo || {};
+      if (info.uptime) document.getElementById('sb-uptime').textContent = info.uptime;
+      if (info.load) {
+        var el = document.getElementById('sb-load');
+        el.textContent = 'CPU: ' + info.load;
+        var pct = parseInt(info.load);
+        el.style.color = pct < 60 ? '#4ecca3' : pct < 80 ? '#f0a500' : '#e94560';
+      }
+      if (info.temp) {
+        var el = document.getElementById('sb-temp');
+        el.textContent = 'Temp: ' + info.temp;
+        var deg = parseFloat(info.temp);
+        el.style.color = deg < 60 ? '#4ecca3' : deg < 70 ? '#f0a500' : deg < 80 ? '#e94560' : '#ff0000';
+      }
+
+      var svcs = info.services || {};
+      var html = '';
+      Object.keys(svcs).forEach(function(name) {
+        var active = svcs[name] === 'active';
+        html += dot(active) + name + '  ';
+        if (name === 'mjpg-streamer') { camOn = active; updateCamBtn(); }
+      });
+      document.getElementById('sb-services').innerHTML = html || 'Services: ?';
+
+      if (info.defcon) {
+        var ds = document.getElementById('defcon-state');
+        ds.textContent = info.defcon;
+        ds.style.color = info.defcon === 'DEFCON 2' ? '#ff0000' : info.defcon === 'DEFCON 4' ? '#00cc00' : '#4488ff';
+        document.title = 'Stars Outside - ' + info.defcon;
+      }
+    })
+    .catch(function() {});
+}
+
+fetch('/api?cmd=status')
+  .then(function(r) { return r.json(); })
+  .then(function(d) { applyStatus(d.output); });
+
+loadSysInfo();
+setInterval(loadSysInfo, 30000);
+</script>
+</body>
+</html>

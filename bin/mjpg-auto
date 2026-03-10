@@ -3,14 +3,21 @@
 
 import math
 import datetime
+import os
 import subprocess
 import sys
+
+_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, _root)
+
+from lib.config import get_current_mode
 
 # Tel Aviv coordinates
 LAT = 32.08
 LON = 34.78
 SWITCH_FILE = "/etc/mjpg-next-switch"
 OFFSET = -15  # minutes before sunrise/after sunset to switch
+
 
 def sun_times(date, lat, lon):
     """Calculate sunrise and sunset times using the solar equations."""
@@ -37,33 +44,23 @@ def sun_times(date, lat, lon):
     sunset = datetime.time(int(sunset_min // 60) % 24, int(sunset_min % 60))
     return sunrise, sunset
 
-def get_current_mode():
-    try:
-        with open("/etc/mjpg-streamer.conf") as f:
-            for line in f:
-                if line.startswith("MODE="):
-                    return line.strip().split("=")[1].strip('"')
-    except FileNotFoundError:
-        pass
-    return "day"
 
 def write_next_switch(target, sunrise, sunset, today):
     """Write next switch time to file for OSD display."""
-    now = datetime.datetime.now()
     if target == "day":
-        # Currently day, next switch is to night at sunset+30min
         next_time = datetime.datetime.combine(today, sunset) - datetime.timedelta(minutes=OFFSET)
         next_label = f"night {next_time.strftime('%H:%M')}"
     else:
-        # Currently night, next switch is to day at sunrise-30min
         tomorrow = today + datetime.timedelta(days=1)
         sr_tomorrow, _ = sun_times(tomorrow, LAT, LON)
         next_time = datetime.datetime.combine(tomorrow, sr_tomorrow) + datetime.timedelta(minutes=OFFSET)
+        now = datetime.datetime.now()
         if now.time() < sunrise:
             next_time = datetime.datetime.combine(today, sunrise) + datetime.timedelta(minutes=OFFSET)
         next_label = f"day {next_time.strftime('%H:%M')}"
     with open(SWITCH_FILE, "w") as f:
         f.write(next_label)
+
 
 def main():
     today = datetime.date.today()
@@ -88,6 +85,7 @@ def main():
         if "--quiet" not in sys.argv:
             print(f"Sunrise: {sunrise.strftime('%H:%M')}, Sunset: {sunset.strftime('%H:%M')}")
             print(f"Already in {target} mode, no change needed")
+
 
 if __name__ == "__main__":
     main()

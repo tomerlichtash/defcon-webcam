@@ -1,264 +1,80 @@
 #!/usr/bin/env python3
 """Monitor Pikud HaOref alerts for Gush Dan."""
 
-import json
-import time
-import urllib.request
-import subprocess
+import os
 import sys
-import tweepy
+import time
 
-URL = "https://www.oref.org.il/warningMessages/alert/Alerts.json"
-HISTORY_URL = "https://www.oref.org.il/warningMessages/alert/History/AlertsHistory.json"
-WATCH_TERMS = ["גבעתיים", "רמת גן", "תל אביב", "בני ברק"]
-ALERT_FILE = "/tmp/mjpg-alert.txt"
-IDLE_FILE = "/tmp/mjpg-idle.txt"
-DEFCON4_FILE = "/tmp/mjpg-clear.txt"  # reuse green overlay for DEFCON 4
-SNAPSHOT_PATH = "/tmp/mjpg-tweet.jpg"
-TWITTER_CONF = "/etc/mjpg-twitter.conf"
-STREAMER_CONF = "/etc/mjpg-streamer.conf"
-STATE_FILE = "/tmp/mjpg-alert-state"
-CHECK_INTERVAL = 3
+_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, _root)
 
-TITLE_PREEMPTIVE = "בדקות הקרובות צפויות להתקבל התרעות באזורך"
-TITLE_ACTUAL = "ירי רקטות וטילים"
-TITLE_ENDED = "האירוע הסתיים"
-
-HEADERS = {
-    "X-Requested-With": "XMLHttpRequest",
-    "Referer": "https://www.oref.org.il/",
-    "User-Agent": "Mozilla/5.0"
-}
-
-state = "idle"
-
-
-def get_current_mode():
-    try:
-        with open(STREAMER_CONF) as f:
-            for line in f:
-                if line.startswith("MODE="):
-                    return line.strip().split("=")[1].strip('"')
-    except Exception:
-        pass
-    return "day"
-
-
-def load_twitter_keys():
-    keys = {}
-    try:
-        with open(TWITTER_CONF) as f:
-            for line in f:
-                line = line.strip()
-                if "=" in line and not line.startswith("#"):
-                    k, v = line.split("=", 1)
-                    keys[k.strip()] = v.strip().strip('"')
-    except Exception as e:
-        print("Failed to load Twitter config: " + str(e), flush=True)
-    return keys
-
-
-def take_alert_snapshot(mode):
-    if mode == "night":
-        subprocess.run(["v4l2-ctl", "--device=/dev/video0",
-            "--set-ctrl=auto_exposure=1",
-            "--set-ctrl=exposure_time_absolute=2047",
-            "--set-ctrl=gain=0"], timeout=5)
-        time.sleep(3)
-
-    subprocess.run(["curl", "-s", "-o", SNAPSHOT_PATH, "--max-time", "10",
-        "http://localhost:8080/?action=snapshot"], timeout=15)
-
-    if mode == "night":
-        subprocess.run(["v4l2-ctl", "--device=/dev/video0",
-            "--set-ctrl=auto_exposure=3",
-            "--set-ctrl=gain=255"], timeout=5)
-
-
-def post_tweet(text, mode):
-    try:
-        take_alert_snapshot(mode)
-
-        keys = load_twitter_keys()
-        if not keys:
-            print("No Twitter keys, skipping tweet", flush=True)
-            return
-
-        auth = tweepy.OAuth1UserHandler(
-            keys["API_KEY"], keys["API_SECRET"],
-            keys["ACCESS_TOKEN"], keys["ACCESS_SECRET"]
-        )
-        api = tweepy.API(auth)
-        media = api.media_upload(SNAPSHOT_PATH)
-
-        client = tweepy.Client(
-            consumer_key=keys["API_KEY"], consumer_secret=keys["API_SECRET"],
-            access_token=keys["ACCESS_TOKEN"], access_token_secret=keys["ACCESS_SECRET"]
-        )
-        client.create_tweet(text=text, media_ids=[media.media_id])
-        print("Tweet posted: " + text, flush=True)
-
-    except Exception as e:
-        print("Tweet failed: " + str(e), flush=True)
-
-
-def _fetch_url(url):
-    """Fetch a URL with cache busting and proper encoding handling."""
-    cache_bust = url + ("&" if "?" in url else "?") + "t=" + str(int(time.time()))
-    req = urllib.request.Request(cache_bust, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=5) as resp:
-        raw = resp.read()
-        # Handle UTF-16-LE BOM
-        if raw[:2] == b"\xff\xfe":
-            return raw.decode("utf-16-le").strip()
-        return raw.decode("utf-8-sig").strip()
-
-
-def _classify_alert(data):
-    """Classify alert data. Returns 'preemptive', 'actual', 'ended', or None."""
-    cities = data.get("data", [])
-    title = data.get("title", "")
-    matched = [c for c in cities if any(t in c for t in WATCH_TERMS)]
-    if matched:
-        if title == TITLE_ENDED:
-            return "ended"
-        elif title == TITLE_ACTUAL:
-            return "actual"
-        elif title == TITLE_PREEMPTIVE:
-            return "preemptive"
-        else:
-            print("Unknown alert title: " + title, flush=True)
-            return "actual"
-    return None
-
-
-def check_alerts():
-    """Check Pikud HaOref API with history fallback. Returns 'preemptive', 'actual', 'ended', or None."""
-    try:
-        raw = _fetch_url(URL)
-        if raw:
-            data = json.loads(raw)
-            result = _classify_alert(data)
-            if result:
-                return result
-
-        # Fallback: check history for recent alerts (last 120 seconds)
-        raw = _fetch_url(HISTORY_URL)
-        if raw:
-            history = json.loads(raw)
-            if isinstance(history, list):
-                now = time.time()
-                for entry in history:
-                    # History entries have alertDate field
-                    alert_date = entry.get("alertDate", "")
-                    if alert_date:
-                        try:
-                            import datetime
-                            dt = datetime.datetime.strptime(alert_date, "%Y-%m-%d %H:%M:%S")
-                            age = now - dt.timestamp()
-                            if age > 120:
-                                continue
-                        except Exception:
-                            continue
-                    result = _classify_alert(entry)
-                    if result:
-                        return result
-    except Exception as e:
-        if "--verbose" in sys.argv:
-            print("Error: " + str(e), flush=True)
-    return None
-
-
-def set_display(idle=" ", alert=" ", defcon4=" "):
-    for path, text in [(IDLE_FILE, idle), (ALERT_FILE, alert), (DEFCON4_FILE, defcon4)]:
-        try:
-            with open(path, "w") as f:
-                f.write(text)
-        except Exception:
-            pass
-
-
-def save_state(s):
-    try:
-        with open(STATE_FILE, "w") as f:
-            f.write(s)
-    except Exception:
-        pass
-
-
-def load_state():
-    try:
-        with open(STATE_FILE) as f:
-            return f.read().strip()
-    except Exception:
-        return "idle"
+from lib.config import CHECK_INTERVAL, WATCH_TERMS, get_current_mode
+from lib.state import state, save_state, load_state, set_display
+from lib import state as state_mod
+from lib.oref import check_alerts
+from lib.twitter import post_tweet
 
 
 def main():
-    global state
     term_count = len(WATCH_TERMS)
     print("Monitoring alerts for Gush Dan (" + str(term_count) + " terms)...", flush=True)
 
     # Restore persisted state
-    state = load_state()
-    if state == "defcon2":
+    state_mod.state = load_state()
+    if state_mod.state == "defcon2":
         ts = time.strftime("%H.%M.%S")
         set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
         print("Resuming in DEFCON 2 (persisted state)", flush=True)
-    elif state == "defcon4":
+    elif state_mod.state == "defcon4":
         ts = time.strftime("%H.%M.%S")
         set_display(defcon4="DEFCON 4 - ALERT INCOMING - " + ts)
         print("Resuming in DEFCON 4 (persisted state)", flush=True)
     else:
-        state = "idle"
+        state_mod.state = "idle"
         set_display(idle="DEFCON 5")
         print("Starting in DEFCON 5", flush=True)
 
     while True:
         result = check_alerts()
 
-        # "האירוע הסתיים" → DEFCON 5 from any state
         if result == "ended":
-            if state != "idle":
+            if state_mod.state != "idle":
                 ts = time.strftime("%H.%M.%S")
                 print("Event ended at " + ts + ", back to DEFCON 5", flush=True)
-                state = "idle"
+                state_mod.state = "idle"
                 save_state("idle")
                 set_display(idle="DEFCON 5")
 
-        # Preemptive alert → DEFCON 4 (only from idle)
         elif result == "preemptive":
-            if state == "idle":
+            if state_mod.state == "idle":
                 ts = time.strftime("%H.%M.%S")
                 print("DEFCON 4: preemptive alert - " + ts, flush=True)
-                state = "defcon4"
+                state_mod.state = "defcon4"
                 save_state("defcon4")
                 set_display(defcon4="DEFCON 4 - ALERT INCOMING - " + ts)
 
-        # Actual alert → DEFCON 2 (from idle or defcon4)
         elif result == "actual":
-            if state in ("idle", "defcon4"):
+            if state_mod.state in ("idle", "defcon4"):
                 ts = time.strftime("%H.%M.%S")
                 ts_tweet = time.strftime("%H:%M:%S")
                 print("DEFCON 2: incoming missiles - " + ts, flush=True)
-                state = "defcon2"
+                state_mod.state = "defcon2"
                 save_state("defcon2")
                 set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
-                # Wait 15s, keep polling, only tweet if still in DEFCON 2
                 tweet_text = "DEFCON 2 - INCOMING MISSILES\n" + ts_tweet
                 mode = get_current_mode()
                 tweet_cancelled = False
-                for _ in range(5):  # 5 x 3s = 15s
+                for _ in range(5):
                     time.sleep(CHECK_INTERVAL)
                     interim = check_alerts()
                     if interim == "ended":
                         print("State changed during tweet delay, cancelling tweet", flush=True)
-                        state = "idle"
+                        state_mod.state = "idle"
                         save_state("idle")
                         set_display(idle="DEFCON 5")
                         tweet_cancelled = True
                         break
-                if not tweet_cancelled and state == "defcon2":
+                if not tweet_cancelled and state_mod.state == "defcon2":
                     post_tweet(tweet_text, mode)
 
         time.sleep(CHECK_INTERVAL)
