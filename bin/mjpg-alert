@@ -9,17 +9,20 @@ import sys
 import tweepy
 
 URL = "https://www.oref.org.il/warningMessages/alert/Alerts.json"
+HISTORY_URL = "https://www.oref.org.il/warningMessages/alert/History/AlertsHistory.json"
 WATCH_TERMS = ["גבעתיים", "רמת גן", "תל אביב", "בני ברק"]
 ALERT_FILE = "/tmp/mjpg-alert.txt"
-CLEAR_FILE = "/tmp/mjpg-clear.txt"
 IDLE_FILE = "/tmp/mjpg-idle.txt"
+DEFCON4_FILE = "/tmp/mjpg-clear.txt"  # reuse green overlay for DEFCON 4
 SNAPSHOT_PATH = "/tmp/mjpg-tweet.jpg"
 TWITTER_CONF = "/etc/mjpg-twitter.conf"
 STREAMER_CONF = "/etc/mjpg-streamer.conf"
 STATE_FILE = "/tmp/mjpg-alert-state"
 CHECK_INTERVAL = 3
-CLEAR_DISPLAY_SECS = 300
-NIGHT_SNAP_INTERVAL = 10
+
+TITLE_PREEMPTIVE = "בדקות הקרובות צפויות להתקבל התרעות באזורך"
+TITLE_ACTUAL = "ירי רקטות וטילים"
+TITLE_ENDED = "האירוע הסתיים"
 
 HEADERS = {
     "X-Requested-With": "XMLHttpRequest",
@@ -28,7 +31,6 @@ HEADERS = {
 }
 
 state = "idle"
-last_matched = set()
 
 
 def get_current_mode():
@@ -100,32 +102,75 @@ def post_tweet(text, mode):
         print("Tweet failed: " + str(e), flush=True)
 
 
+def _fetch_url(url):
+    """Fetch a URL with cache busting and proper encoding handling."""
+    cache_bust = url + ("&" if "?" in url else "?") + "t=" + str(int(time.time()))
+    req = urllib.request.Request(cache_bust, headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        raw = resp.read()
+        # Handle UTF-16-LE BOM
+        if raw[:2] == b"\xff\xfe":
+            return raw.decode("utf-16-le").strip()
+        return raw.decode("utf-8-sig").strip()
+
+
+def _classify_alert(data):
+    """Classify alert data. Returns 'preemptive', 'actual', 'ended', or None."""
+    cities = data.get("data", [])
+    title = data.get("title", "")
+    matched = [c for c in cities if any(t in c for t in WATCH_TERMS)]
+    if matched:
+        if title == TITLE_ENDED:
+            return "ended"
+        elif title == TITLE_ACTUAL:
+            return "actual"
+        elif title == TITLE_PREEMPTIVE:
+            return "preemptive"
+        else:
+            print("Unknown alert title: " + title, flush=True)
+            return "actual"
+    return None
+
+
 def check_alerts():
-    global last_matched
+    """Check Pikud HaOref API with history fallback. Returns 'preemptive', 'actual', 'ended', or None."""
     try:
-        req = urllib.request.Request(URL, headers=HEADERS)
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            raw = resp.read().decode("utf-8-sig").strip()
-            if not raw:
-                return None
+        raw = _fetch_url(URL)
+        if raw:
             data = json.loads(raw)
-            cities = data.get("data", [])
-            title = data.get("title", "")
-            matched = [c for c in cities if any(t in c for t in WATCH_TERMS)]
-            if matched:
-                last_matched = matched
-                if title == "האירוע הסתיים":
-                    return "clear"
-                else:
-                    return "alert"
+            result = _classify_alert(data)
+            if result:
+                return result
+
+        # Fallback: check history for recent alerts (last 120 seconds)
+        raw = _fetch_url(HISTORY_URL)
+        if raw:
+            history = json.loads(raw)
+            if isinstance(history, list):
+                now = time.time()
+                for entry in history:
+                    # History entries have alertDate field
+                    alert_date = entry.get("alertDate", "")
+                    if alert_date:
+                        try:
+                            import datetime
+                            dt = datetime.datetime.strptime(alert_date, "%Y-%m-%d %H:%M:%S")
+                            age = now - dt.timestamp()
+                            if age > 120:
+                                continue
+                        except Exception:
+                            continue
+                    result = _classify_alert(entry)
+                    if result:
+                        return result
     except Exception as e:
         if "--verbose" in sys.argv:
             print("Error: " + str(e), flush=True)
     return None
 
 
-def set_display(idle=" ", alert=" ", clear=" "):
-    for path, text in [(IDLE_FILE, idle), (ALERT_FILE, alert), (CLEAR_FILE, clear)]:
+def set_display(idle=" ", alert=" ", defcon4=" "):
+    for path, text in [(IDLE_FILE, idle), (ALERT_FILE, alert), (DEFCON4_FILE, defcon4)]:
         try:
             with open(path, "w") as f:
                 f.write(text)
@@ -140,6 +185,7 @@ def save_state(s):
     except Exception:
         pass
 
+
 def load_state():
     try:
         with open(STATE_FILE) as f:
@@ -147,71 +193,73 @@ def load_state():
     except Exception:
         return "idle"
 
+
 def main():
     global state
     term_count = len(WATCH_TERMS)
     print("Monitoring alerts for Gush Dan (" + str(term_count) + " terms)...", flush=True)
-    clear_time = 0
-    last_night_snap = 0
-    snap_count = 0
 
     # Restore persisted state
     state = load_state()
-    if state == "alert":
+    if state == "defcon2":
         ts = time.strftime("%H.%M.%S")
         set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
         print("Resuming in DEFCON 2 (persisted state)", flush=True)
-    elif state == "clear":
+    elif state == "defcon4":
         ts = time.strftime("%H.%M.%S")
-        set_display(clear="ALL CLEAR - " + ts)
-        clear_time = time.time()
-        print("Resuming in ALL CLEAR (persisted state)", flush=True)
+        set_display(defcon4="DEFCON 4 - ALERT INCOMING - " + ts)
+        print("Resuming in DEFCON 4 (persisted state)", flush=True)
     else:
+        state = "idle"
         set_display(idle="DEFCON 5")
         print("Starting in DEFCON 5", flush=True)
 
     while True:
         result = check_alerts()
 
-        if state == "idle" or state == "clear":
-            if result == "alert":
+        # "האירוע הסתיים" → DEFCON 5 from any state
+        if result == "ended":
+            if state != "idle":
+                ts = time.strftime("%H.%M.%S")
+                print("Event ended at " + ts + ", back to DEFCON 5", flush=True)
+                state = "idle"
+                save_state("idle")
+                set_display(idle="DEFCON 5")
+
+        # Preemptive alert → DEFCON 4 (only from idle)
+        elif result == "preemptive":
+            if state == "idle":
+                ts = time.strftime("%H.%M.%S")
+                print("DEFCON 4: preemptive alert - " + ts, flush=True)
+                state = "defcon4"
+                save_state("defcon4")
+                set_display(defcon4="DEFCON 4 - ALERT INCOMING - " + ts)
+
+        # Actual alert → DEFCON 2 (from idle or defcon4)
+        elif result == "actual":
+            if state in ("idle", "defcon4"):
                 ts = time.strftime("%H.%M.%S")
                 ts_tweet = time.strftime("%H:%M:%S")
+                print("DEFCON 2: incoming missiles - " + ts, flush=True)
+                state = "defcon2"
+                save_state("defcon2")
                 set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
-                print("ALERT: " + ts, flush=True)
-                state = "alert"
-                save_state("alert")
-                clear_time = 0
-                snap_count = 1
-                last_night_snap = time.time()
-                mode = get_current_mode()
+                # Wait 15s, keep polling, only tweet if still in DEFCON 2
                 tweet_text = "DEFCON 2 - INCOMING MISSILES\n" + ts_tweet
-                time.sleep(3)  # wait for OSD overlay to update
-                post_tweet(tweet_text, mode)
-
-        elif state == "alert":
-            if result == "clear":
-                ts = time.strftime("%H.%M.%S")
-                ts_tweet = time.strftime("%H:%M:%S")
-                set_display(clear="ALL CLEAR - " + ts)
-                print("ALL CLEAR: " + ts, flush=True)
-                state = "clear"
-                save_state("clear")
-                clear_time = time.time()
-                last_night_snap = 0
-                snap_count = 0
                 mode = get_current_mode()
-            else:
-                pass
-
-        if state == "clear" and clear_time and time.time() - clear_time > CLEAR_DISPLAY_SECS:
-            set_display(idle="DEFCON 5")
-            state = "idle"
-            save_state("idle")
-            clear_time = 0
-            print("Back to idle", flush=True)
-            mode = get_current_mode()
-            ts_tweet = time.strftime("%H:%M:%S")
+                tweet_cancelled = False
+                for _ in range(5):  # 5 x 3s = 15s
+                    time.sleep(CHECK_INTERVAL)
+                    interim = check_alerts()
+                    if interim == "ended":
+                        print("State changed during tweet delay, cancelling tweet", flush=True)
+                        state = "idle"
+                        save_state("idle")
+                        set_display(idle="DEFCON 5")
+                        tweet_cancelled = True
+                        break
+                if not tweet_cancelled and state == "defcon2":
+                    post_tweet(tweet_text, mode)
 
         time.sleep(CHECK_INTERVAL)
 

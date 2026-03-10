@@ -10,7 +10,7 @@ import sys
 LAT = 32.08
 LON = 34.78
 SWITCH_FILE = "/etc/mjpg-next-switch"
-OFFSET = 45  # minutes before sunrise/after sunset to switch
+OFFSET = -15  # minutes before sunrise/after sunset to switch
 
 def sun_times(date, lat, lon):
     """Calculate sunrise and sunset times using the solar equations."""

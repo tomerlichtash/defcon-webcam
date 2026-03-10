@@ -80,6 +80,11 @@ apply() {
       ;;
   esac
 
+  local EQ_FILTER=""
+  if [ "$MODE" = "day" ]; then
+    EQ_FILTER="eq=brightness=-0.05:gamma=0.9,"
+  fi
+
   local ROT_FILTER=""
   case "$ROTATE" in
     90)  ROT_FILTER="transpose=1," ;;
@@ -108,7 +113,7 @@ $V4L2_CMD
 
 ffmpeg -f v4l2 -input_format mjpeg -video_size $VIDEO_SIZE -framerate $FPS \\
   -i /dev/video0 \\
-  -vf "${ROT_FILTER}drawtext=textfile=/tmp/mjpg-osd.txt:reload=1:fontfile=${FONT}:fontsize=12:fontcolor=white:borderw=2:bordercolor=black:x=10:y=h-30,drawtext=textfile=/tmp/mjpg-idle.txt:reload=1:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf:fontsize=28:fontcolor=0x4488FF:borderw=2:bordercolor=black:x=10:y=10,drawtext=textfile=/tmp/mjpg-alert.txt:reload=1:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf:fontsize=28:fontcolor=red:borderw=2:bordercolor=black:x=10:y=10,drawtext=textfile=/tmp/mjpg-clear.txt:reload=1:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf:fontsize=28:fontcolor=green:borderw=2:bordercolor=black:x=10:y=10,drawtext=text='%{localtime}':fontfile=${FONT}:fontsize=14:fontcolor=white:borderw=1:bordercolor=black:x=w-tw-10:y=h-30" \\
+  -vf "${ROT_FILTER}${EQ_FILTER}drawtext=textfile=/tmp/mjpg-osd.txt:reload=1:fontfile=${FONT}:fontsize=12:fontcolor=white:borderw=2:bordercolor=black:x=10:y=h-30,drawtext=textfile=/tmp/mjpg-idle.txt:reload=1:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf:fontsize=28:fontcolor=0x4488FF:borderw=2:bordercolor=black:x=10:y=10,drawtext=textfile=/tmp/mjpg-alert.txt:reload=1:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf:fontsize=28:fontcolor=red:borderw=2:bordercolor=black:x=10:y=10,drawtext=textfile=/tmp/mjpg-clear.txt:reload=1:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf:fontsize=28:fontcolor=green:borderw=2:bordercolor=black:x=10:y=10,drawtext=text='%{localtime}':fontfile=${FONT}:fontsize=14:fontcolor=white:borderw=1:bordercolor=black:x=w-tw-10:y=h-30" \\
   -update 1 -atomic_writing 1 -q:v 3 \\
   "\$TMPDIR/snap.jpg" &
 FFPID=\$!
