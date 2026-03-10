@@ -203,6 +203,7 @@ case "$1" in
     echo "Rotation: ${ROTATE}°"
     echo "Resolution: $RES ($(get_video_size))"
     echo "Brightness: $BRIGHT%"
+    echo "FPS: $FPS"
     echo "Zoom: $ZOOM (1x-5x)"
     if [ -f "$SWITCH_FILE" ]; then
       echo "Next switch: $(cat $SWITCH_FILE)"

@@ -45,37 +45,37 @@ HTML = """<!DOCTYPE html>
   <div class="controls">
     <div class="panel">
       <h3>Mode</h3>
-      <div class="btn-group">
-        <button class="btn" onclick="cmd('day')">Day</button>
-        <button class="btn" onclick="cmd('night')">Night</button>
-        <button class="btn" onclick="cmd('indoor')">Indoor</button>
+      <div class="btn-group" data-group="mode">
+        <button class="btn" data-val="day" onclick="cmd('day')">Day</button>
+        <button class="btn" data-val="night" onclick="cmd('night')">Night</button>
+        <button class="btn" data-val="indoor" onclick="cmd('indoor')">Indoor</button>
       </div>
     </div>
     <div class="panel">
       <h3>Resolution</h3>
-      <div class="btn-group">
-        <button class="btn" onclick="cmd('res low')">Low 480p</button>
-        <button class="btn" onclick="cmd('res mid')">Mid 720p</button>
-        <button class="btn" onclick="cmd('res high')">High 1080p</button>
+      <div class="btn-group" data-group="res">
+        <button class="btn" data-val="low" onclick="cmd('res low')">Low 480p</button>
+        <button class="btn" data-val="mid" onclick="cmd('res mid')">Mid 720p</button>
+        <button class="btn" data-val="high" onclick="cmd('res high')">High 1080p</button>
       </div>
     </div>
     <div class="panel">
       <h3>Rotation</h3>
-      <div class="btn-group">
-        <button class="btn" onclick="cmd('rotate 0')">0&deg;</button>
-        <button class="btn" onclick="cmd('rotate 90')">90&deg;</button>
-        <button class="btn" onclick="cmd('rotate 180')">180&deg;</button>
-        <button class="btn" onclick="cmd('rotate 270')">270&deg;</button>
+      <div class="btn-group" data-group="rotation">
+        <button class="btn" data-val="0" onclick="cmd('rotate 0')">0&deg;</button>
+        <button class="btn" data-val="90" onclick="cmd('rotate 90')">90&deg;</button>
+        <button class="btn" data-val="180" onclick="cmd('rotate 180')">180&deg;</button>
+        <button class="btn" data-val="270" onclick="cmd('rotate 270')">270&deg;</button>
       </div>
     </div>
     <div class="panel">
       <h3>FPS</h3>
-      <div class="btn-group">
-        <button class="btn" onclick="cmd('fps 5')">5</button>
-        <button class="btn" onclick="cmd('fps 10')">10</button>
-        <button class="btn" onclick="cmd('fps 15')">15</button>
-        <button class="btn" onclick="cmd('fps 24')">24</button>
-        <button class="btn" onclick="cmd('fps 30')">30</button>
+      <div class="btn-group" data-group="fps">
+        <button class="btn" data-val="5" onclick="cmd('fps 5')">5</button>
+        <button class="btn" data-val="10" onclick="cmd('fps 10')">10</button>
+        <button class="btn" data-val="15" onclick="cmd('fps 15')">15</button>
+        <button class="btn" data-val="24" onclick="cmd('fps 24')">24</button>
+        <button class="btn" data-val="30" onclick="cmd('fps 30')">30</button>
       </div>
     </div>
     <div class="panel">
@@ -99,33 +99,68 @@ HTML = """<!DOCTYPE html>
   </div>
 </div>
 <script>
+function setActive(group, val) {
+  var grp = document.querySelector('[data-group="' + group + '"]');
+  if (!grp) return;
+  grp.querySelectorAll('.btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-val') === val);
+  });
+}
+
+function applyStatus(output) {
+  var lines = output.split('\\n');
+  lines.forEach(function(l) {
+    var m;
+    if (m = l.match(/Mode: (\\w+)/)) setActive('mode', m[1]);
+    if (m = l.match(/Resolution: (\\w+)/)) setActive('res', m[1]);
+    if (m = l.match(/Rotation: (\\d+)/)) setActive('rotation', m[1]);
+    if (m = l.match(/Brightness: (\\d+)/)) {
+      document.getElementById('bright').value = m[1];
+      sliderUpdate('bright', m[1]);
+    }
+    if (m = l.match(/FPS: (\\d+)/)) setActive('fps', m[1]);
+    if (m = l.match(/Zoom: (\\d+)/)) {
+      document.getElementById('zoom').value = m[1];
+      sliderUpdate('zoom', m[1]);
+    }
+  });
+}
+
+function cmdToGroup(c) {
+  if (c === 'day' || c === 'night' || c === 'indoor') return {group: 'mode', val: c};
+  var m;
+  if (m = c.match(/^res (\\w+)/)) return {group: 'res', val: m[1]};
+  if (m = c.match(/^rotate (\\d+)/)) return {group: 'rotation', val: m[1]};
+  if (m = c.match(/^fps (\\d+)/)) return {group: 'fps', val: m[1]};
+  return null;
+}
+
 function cmd(c) {
   document.getElementById('status').textContent = 'Applying: ' + c + '...';
   fetch('/api?cmd=' + encodeURIComponent(c))
-    .then(r => r.json())
-    .then(d => {
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
       document.getElementById('status').textContent = d.output || 'Done';
+      var g = cmdToGroup(c);
+      if (g) setActive(g.group, g.val);
       if (c.startsWith('res ') || c.startsWith('rotate ') || c.startsWith('fps ') || c === 'day' || c === 'night' || c === 'indoor') {
-        setTimeout(() => {
-          let img = document.getElementById('stream');
+        setTimeout(function() {
+          var img = document.getElementById('stream');
           img.src = img.src.split('?')[0] + '?action=stream&t=' + Date.now();
         }, 5000);
       }
     })
-    .catch(e => document.getElementById('status').textContent = 'Error: ' + e);
+    .catch(function(e) { document.getElementById('status').textContent = 'Error: ' + e; });
 }
+
 function sliderUpdate(id, val) {
   document.getElementById(id + '-val').textContent = val;
 }
-// Load current status
-fetch('/api?cmd=status').then(r=>r.json()).then(d=>{
-  let lines = d.output.split('\\n');
-  lines.forEach(l => {
-    let m;
-    if (m = l.match(/Brightness: (\\d+)/)) document.getElementById('bright').value = m[1], sliderUpdate('bright',m[1]);
-    if (m = l.match(/Zoom: (\\d+)/)) document.getElementById('zoom').value = m[1], sliderUpdate('zoom',m[1]);
-  });
-});
+
+// Load current status on page load
+fetch('/api?cmd=status')
+  .then(function(r) { return r.json(); })
+  .then(function(d) { applyStatus(d.output); });
 </script>
 </body>
 </html>"""
@@ -137,7 +172,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             params = urllib.parse.parse_qs(query)
             cmd = params.get('cmd', ['status'])[0]
             # Only allow known commands
-            allowed = ['day', 'night', 'indoor', 'status']
+            allowed = ['day', 'night', 'indoor', 'status', 'focus']
             prefixes = ['res ', 'rotate ', 'bright ', 'zoom ', 'fps ']
             if cmd not in allowed and not any(cmd.startswith(p) for p in prefixes):
                 self.send_response(400)
