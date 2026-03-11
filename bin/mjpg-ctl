@@ -2,7 +2,7 @@
 CONF="/etc/mjpg-streamer.conf"
 SERVICE="mjpg-streamer"
 LAUNCHER="/usr/local/bin/mjpg-rotated.sh"
-FONT="/home/tomer/defcon-cam/static/fonts/Exo2-Bold.ttf"
+FONT='DejaVu Sans'
 SWITCH_FILE="/etc/mjpg-next-switch"
 
 # Load current config or defaults
@@ -82,7 +82,7 @@ apply() {
 
   local EQ_FILTER=""
   if [ "$MODE" = "day" ]; then
-    EQ_FILTER="eq=brightness=-0.05:gamma=0.9,"
+    EQ_FILTER=""
   fi
 
   local ROT_FILTER=""
@@ -111,28 +111,12 @@ apply() {
 
   sudo bash -c "cat > $LAUNCHER" <<EOLAUNCHER
 #!/bin/bash
-# Ensure OSD text files exist
-for f in /tmp/mjpg-idle.txt /tmp/mjpg-alert.txt /tmp/mjpg-clear.txt /tmp/mjpg-osd.txt; do [ -f "\$f" ] || echo " " > "\$f"; done
-
-TMPDIR=\$(mktemp -d)
-trap "rm -rf \$TMPDIR" EXIT
 
 $V4L2_CMD
 
-ffmpeg -f v4l2 -input_format mjpeg -video_size $VIDEO_SIZE -framerate $FPS \\
-  -i /dev/video0 \\
-  -vf "${ROT_FILTER}${EQ_FILTER}drawtext=textfile=/tmp/mjpg-osd.txt:reload=1:fontfile=${FONT}:fontsize=${FS_OSD}:fontcolor=white:borderw=1:bordercolor=black:x=10:y=h-30,drawtext=textfile=/tmp/mjpg-idle.txt:reload=1:fontfile=${FONT}:fontsize=${FS_DEFCON}:fontcolor=0x4488FF:borderw=${BW_DEFCON}:bordercolor=black:x=10:y=10,drawtext=textfile=/tmp/mjpg-alert.txt:reload=1:fontfile=${FONT}:fontsize=${FS_DEFCON}:fontcolor=red:borderw=${BW_DEFCON}:bordercolor=black:x=10:y=10,drawtext=textfile=/tmp/mjpg-clear.txt:reload=1:fontfile=${FONT}:fontsize=${FS_DEFCON}:fontcolor=green:borderw=${BW_DEFCON}:bordercolor=black:x=10:y=10,drawtext=text='%{localtime}':fontfile=${FONT}:fontsize=${FS_TIME}:fontcolor=white:borderw=1:bordercolor=black:x=w-tw-10:y=h-30" \\
-  -update 1 -atomic_writing 1 -q:v 3 \\
-  "\$TMPDIR/snap.jpg" &
-FFPID=\$!
-
-sleep 2
-
 /usr/local/bin/mjpg_streamer \\
-  -i "input_file.so -f \$TMPDIR -n snap.jpg -d 0" \\
+  -i "input_uvc.so -d /dev/video0 -r $VIDEO_SIZE -f $FPS" \\
   -o "output_http.so -p 8080 -w /usr/local/share/mjpg-streamer/www"
-
-kill \$FFPID 2>/dev/null
 EOLAUNCHER
   sudo chmod +x "$LAUNCHER"
 

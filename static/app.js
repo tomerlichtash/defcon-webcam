@@ -4,11 +4,14 @@ function app() {
     /* Reactive state */
     status: '',
     defcon: 'DEFCON 5',
-    camOn: false,
+    defconTime: '',
+    camOn: localStorage.getItem('camOn') === 'true',
+    camHover: false,
+    camLoading: false,
     bright: 58,
     zoom: 100,
-    pubTelegram: true,
-    pubTwitter: false,
+    pubTelegram: localStorage.getItem('pubTelegram') !== 'false',
+    pubTwitter: localStorage.getItem('pubTwitter') === 'true',
     pubStatus: '',
     filters: JSON.parse(localStorage.getItem('filters') || '{"alerts":true,"scans":true,"status":true,"system":true}'),
     eventLog: [],
@@ -17,12 +20,42 @@ function app() {
     noPolling: new URLSearchParams(location.search).get('polling') === 'false',
     webRestarting: false,
     panels: Object.assign({"publish":false,"image":true,"advanced":false,"alertLog":false,"scanLog":false,"sysinfo":false,"services":false,"debug":false,"eventLog":true}, JSON.parse(localStorage.getItem('panels') || '{}')),
-    streamSrc: '',
     sys: { uptime: 'Uptime: ...', load: '...', temp: '...', dbSize: '...', dbOk: false },
+    cpuHistory: [],
+    tempHistory: [],
     services: {},
     active: { mode: '', res: '', rotation: '', fps: '' },
     lastRes: '',
     lastFps: '',
+
+    /* Sparkline SVG generator */
+    _sparkId: 0,
+    sparkline(data, color, max) {
+      if (data.length < 2) return '';
+      var w = 80, h = 24, pad = 2;
+      var id = 'sp' + (this._sparkId++);
+      var step = (w - pad * 2) / (data.length - 1);
+      var pts = data.map(function(v, i) {
+        return { x: pad + i * step, y: pad + (h - pad * 2) - (Math.min(v, max) / max) * (h - pad * 2) };
+      });
+      /* Smooth cubic bezier path */
+      var d = 'M' + pts[0].x.toFixed(1) + ',' + pts[0].y.toFixed(1);
+      for (var i = 1; i < pts.length; i++) {
+        var cx = (pts[i - 1].x + pts[i].x) / 2;
+        d += ' C' + cx.toFixed(1) + ',' + pts[i - 1].y.toFixed(1) + ' ' + cx.toFixed(1) + ',' + pts[i].y.toFixed(1) + ' ' + pts[i].x.toFixed(1) + ',' + pts[i].y.toFixed(1);
+      }
+      /* Area fill path */
+      var areaD = d + ' L' + pts[pts.length - 1].x.toFixed(1) + ',' + (h - pad) + ' L' + pts[0].x.toFixed(1) + ',' + (h - pad) + ' Z';
+      var last = pts[pts.length - 1];
+      return '<svg width="' + w + '" height="' + h + '" style="margin-right:6px">'
+        + '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + color + '" stop-opacity="0.3"/><stop offset="100%" stop-color="' + color + '" stop-opacity="0.02"/></linearGradient></defs>'
+        + '<path d="' + areaD + '" fill="url(#' + id + ')"/>'
+        + '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '<circle cx="' + last.x.toFixed(1) + '" cy="' + last.y.toFixed(1) + '" r="2" fill="' + color + '"/>'
+        + '</svg>';
+    },
+    get cpuSpark() { return this.sparkline(this.cpuHistory, this.cpuColor, 100); },
+    get tempSpark() { return this.sparkline(this.tempHistory, this.tempColor, 100); },
 
     /* Computed colors */
     get cpuColor() {
@@ -36,6 +69,19 @@ function app() {
     get defconColor() {
       return this.defcon === 'DEFCON 2' ? '#ff0000' : this.defcon === 'DEFCON 4' ? '#00cc00' : '#4488ff';
     },
+    get defconLabel() {
+      if (this.defcon === 'DEFCON 2') return 'INCOMING MISSILES - ' + this.defconTime + ' [DEFCON 2]';
+      if (this.defcon === 'DEFCON 4') return 'INCOMING ALERT - ' + this.defconTime + ' [DEFCON 4]';
+      return 'CLEAR SKIES [DEFCON 5]';
+    },
+    get osdLine() {
+      var parts = [];
+      if (this.active.mode) parts.push(this.active.mode);
+      if (this.active.res) parts.push(this.active.res);
+      if (this.active.fps) parts.push(this.active.fps + 'fps');
+      if (this.active.rotation && this.active.rotation !== '0') parts.push('rot ' + this.active.rotation);
+      return parts.join(' | ');
+    },
     get allServicesUp() {
       var svcs = this.services;
       var keys = Object.keys(svcs);
@@ -44,7 +90,7 @@ function app() {
     },
     get servicesRows() {
       var self = this;
-      var labels = {'mjpg-alert': 'Alert', 'mjpg-streamer': 'Streamer', 'ffmpeg': 'FFmpeg'};
+      var labels = {'mjpg-alert': 'Alert', 'mjpg-streamer': 'Streamer'};
       var keys = Object.keys(this.services);
       return keys.map(function(name) {
         var state = self.services[name];
@@ -82,8 +128,20 @@ function app() {
       this.$watch('filters', function(val) {
         localStorage.setItem('filters', JSON.stringify(val));
       }, { deep: true });
+      this.$watch('pubTelegram', function(val) { localStorage.setItem('pubTelegram', val); });
+      this.$watch('pubTwitter', function(val) { localStorage.setItem('pubTwitter', val); });
+      this.$watch('camOn', function(val) {
+        var el = document.getElementById('stream');
+        if (el) el.style.display = val ? '' : 'none';
+        self.camLoading = false;
+        localStorage.setItem('camOn', val);
+      });
       var host = location.hostname || '10.0.0.238';
-      this.streamSrc = 'http://' + host + ':8080/?action=stream';
+      var streamEl = document.getElementById('stream');
+      if (this.camOn && streamEl) {
+        streamEl.src = 'http://' + host + ':8080/?action=stream';
+        streamEl.style.display = '';
+      }
       var noPolling = new URLSearchParams(location.search).get('polling') === 'false';
       this.fetchStatus();
       this.loadSysInfo();
@@ -167,8 +225,10 @@ function app() {
       var base = 'http://' + host + ':8080/';
       fetch(base + '?action=snapshot&t=' + Date.now(), { mode: 'no-cors' })
         .then(function() {
-          self.streamSrc = base + '?action=stream&t=' + Date.now();
+          var streamEl = document.getElementById('stream');
+          if (streamEl) streamEl.src = base + '?action=stream&t=' + Date.now();
           self.camOn = true;
+          self.camLoading = false;
           self.status = '';
         })
         .catch(function() {
@@ -176,19 +236,21 @@ function app() {
             setTimeout(function() { self.tryLoadStream(attempt + 1); }, 2000);
           } else {
             self.status = 'Stream unavailable';
+            self.camLoading = false;
           }
         });
     },
 
     /* Start, stop, or restart the camera service */
     camCtl(action) {
+      this.camLoading = true;
       this.status = 'Camera: ' + action + '...';
       if (action === 'start' || action === 'restart') {
         this.services['mjpg-streamer'] = 'activating';
-        this.services['ffmpeg'] = 'activating';
+
       } else if (action === 'stop') {
         this.services['mjpg-streamer'] = 'deactivating';
-        this.services['ffmpeg'] = 'deactivating';
+
       }
       var self = this;
       fetch('/api?cmd=camctl+' + action)
@@ -196,10 +258,11 @@ function app() {
         .then(d => {
           self.status = d.output || 'Done';
           if (action !== 'stop') self.countdown(3);
+          /* For stop, clear loading after sysinfo confirms */
           /* Delay sysinfo poll to let services fully start */
           setTimeout(function() { self.loadSysInfo(); }, 3000);
         })
-        .catch(e => { self.status = 'Error: ' + e; });
+        .catch(e => { self.status = 'Error: ' + e; self.camLoading = false; });
     },
 
     /* Restart the web server and reload */
@@ -222,26 +285,38 @@ function app() {
         .then(d => {
           var info = d.sysinfo || {};
           if (info.uptime) self.sys.uptime = info.uptime.replace(/^up\s+/, '');
-          if (info.load) self.sys.load = info.load;
-          if (info.temp) self.sys.temp = info.temp;
+          if (info.load) {
+            self.sys.load = info.load;
+            self.cpuHistory.push(parseInt(info.load));
+            if (self.cpuHistory.length > 30) self.cpuHistory.shift();
+          }
+          if (info.temp) {
+            self.sys.temp = info.temp;
+            self.tempHistory.push(parseFloat(info.temp));
+            if (self.tempHistory.length > 30) self.tempHistory.shift();
+          }
           if (info.db_size) self.sys.dbSize = info.db_size;
           self.sys.dbOk = info.db_ok !== false;
 
           if (info.services) {
             self.services = info.services;
             var streamerActive = info.services['mjpg-streamer'] === 'active';
-            if (!streamerActive) {
-              self.camOn = false;
-            } else if (!self.camOn) {
-              self.status = 'Connecting to stream...';
-              self.tryLoadStream(0);
+            if (streamerActive !== self.camOn) {
+              if (!streamerActive) {
+                self.camOn = false;
+              } else {
+                self.status = 'Connecting to stream...';
+                self.tryLoadStream(0);
+              }
             }
-            self.camOn = streamerActive;
           }
 
           if (info.defcon) {
+            if (info.defcon !== self.defcon && info.defcon !== 'DEFCON 5') {
+              self.defconTime = new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+            }
             self.defcon = info.defcon;
-            document.title = 'Stars Outside - ' + info.defcon;
+            document.title = 'Stars Outside - ' + self.defconLabel;
           }
         })
         .catch(function() {});
@@ -322,8 +397,11 @@ function app() {
           var newEvents = d.log || [];
           self.eventTotal = d.total || 0;
           if (d.defcon) {
+            if (d.defcon !== self.defcon && d.defcon !== 'DEFCON 5') {
+              self.defconTime = new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+            }
             self.defcon = d.defcon;
-            document.title = 'Stars Outside - ' + d.defcon;
+            document.title = 'Stars Outside - ' + self.defconLabel;
           }
           if (self.eventLog.length === 0) {
             /* Initial load */

@@ -30,12 +30,6 @@ def get_sysinfo():
         except Exception:
             services[svc] = "unknown"
 
-    try:
-        r = subprocess.run(["pgrep", "-c", "ffmpeg"],
-                           capture_output=True, text=True, timeout=5)
-        services["ffmpeg"] = "active" if r.returncode == 0 else "inactive"
-    except Exception:
-        services["ffmpeg"] = "unknown"
 
     info["services"] = services
 

@@ -12,27 +12,28 @@
 <main class="container-fluid">
   <nav>
     <ul>
-      <li><strong class="site-title">✨ Stars Outside: <span class="defcon-label" :class="{'siren': defcon === 'DEFCON 2'}" :style="{color: defconColor}" x-text="defcon">DEFCON 5</span></strong> <span class="status-bar" x-show="status" x-text="status"></span></li>
+      <li><strong class="site-title">✨ Stars Outside &nbsp;|&nbsp; <span class="defcon-label" :class="{'siren': defcon === 'DEFCON 2'}" :style="{color: defconColor}" x-text="defconLabel">CLEAR SKIES</span></strong> <span class="status-bar" x-show="status" x-text="status"></span></li>
     </ul>
     <ul>
+      <li x-show="camOn"><button class="cam-toggle-btn refocus-btn" @click="publish()">PUBLISH</button></li>
       <li x-show="camOn"><button class="cam-toggle-btn refocus-btn" @click="cmd('focus')">FOCUS</button></li>
-      <li><button class="cam-toggle-btn" :class="camOn ? 'on' : 'off'"
-                   @click="camCtl(camOn ? 'stop' : 'start')"
-                   x-text="camOn ? 'CAM ON' : 'CAM OFF'"></button></li>
+      <li><button class="cam-toggle-btn" :class="(camOn && !camHover) || (!camOn && camHover) ? 'on' : 'off'"
+                   @click="camCtl(camOn ? 'stop' : 'start')" :disabled="camLoading"
+                   @mouseenter="camHover = true" @mouseleave="camHover = false"
+><span x-show="!camLoading" x-text="camHover ? (camOn ? 'TURN OFF' : 'TURN ON') : (camOn ? 'CAMERA ON' : 'CAMERA OFF')"></span><span x-show="camLoading" class="cam-spinner"></span></button></li>
     </ul>
   </nav>
 
   <div class="main-layout">
     <div class="stream-col">
-      <img id="stream" :src="streamSrc" alt="Camera Stream"
-           x-show="camOn" class="stream-img">
+      <img id="stream" alt="Camera Stream"
+           class="stream-img" style="display:none">
       <article x-show="!camOn" class="empty-state">
         <div>
           <p>Sky is clear!</p>
           <button class="outline" @click="camCtl('start')">Take a look</button>
         </div>
       </article>
-      <button class="publish-btn" x-show="camOn" @click="publish()" style="margin-top:8px; padding:0.6em 0.8em">Publish Snapshot</button>
       <p class="status-text" x-show="camOn && pubStatus" x-text="pubStatus"></p>
 
       <div class="agg-log-panel">
@@ -103,13 +104,13 @@
           <div class="sysinfo-section">
             <div class="sysinfo-row">
               <span class="sysinfo-label">CPU</span>
-              <span :style="{color: cpuColor}" x-text="sys.load"></span>
+              <span class="spark-value"><span x-html="cpuSpark"></span><span :style="{color: cpuColor}" x-text="sys.load"></span></span>
             </div>
           </div>
           <div class="sysinfo-section">
             <div class="sysinfo-row">
               <span class="sysinfo-label">Temp</span>
-              <span :style="{color: tempColor}" x-text="sys.temp"></span>
+              <span class="spark-value"><span x-html="tempSpark"></span><span :style="{color: tempColor}" x-text="sys.temp"></span></span>
             </div>
           </div>
           <div class="svc-row" style="margin-top:6px">
@@ -128,7 +129,7 @@
 
       <article>
         <header @click="panels.image = !panels.image">
-          Camera Settings <span x-html="panels.image ? '&#9662;' : '&#9656;'"></span>
+          Camera <span x-html="panels.image ? '&#9662;' : '&#9656;'"></span>
         </header>
         <div x-show="panels.image" :class="{'controls-disabled': !camOn}" class="settings-panel">
           <div class="setting-row">
@@ -182,12 +183,17 @@
 
       <article>
         <header @click="panels.publish = !panels.publish">
-          General <span x-html="panels.publish ? '&#9662;' : '&#9656;'"></span>
+          Channels <span x-html="panels.publish ? '&#9662;' : '&#9656;'"></span>
         </header>
-        <div x-show="panels.publish" class="control-group" style="padding-bottom:10px">
-          <label class="control-label">Publish Targets</label>
-          <label><input type="checkbox" x-model="pubTelegram"> Telegram</label>
-          <label><input type="checkbox" x-model="pubTwitter"> Twitter</label>
+        <div x-show="panels.publish" class="settings-panel">
+          <div class="setting-row">
+            <span class="sysinfo-label">Telegram</span>
+            <input type="checkbox" x-model="pubTelegram">
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label">Twitter</span>
+            <input type="checkbox" x-model="pubTwitter">
+          </div>
         </div>
       </article>
 
