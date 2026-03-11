@@ -24,7 +24,7 @@ function app() {
     cpuHistory: [],
     tempHistory: [],
     services: {},
-    active: { mode: '', res: '', rotation: '', fps: '', grayscale: false, invert: false },
+    active: { mode: '', res: '', rotation: '', fps: '', grayscale: localStorage.getItem('filterGrayscale') === 'true', invert: localStorage.getItem('filterInvert') === 'true' },
     lastRes: '',
     lastFps: '',
 
@@ -142,6 +142,7 @@ function app() {
         streamEl.src = 'http://' + host + ':8080/?action=stream';
         streamEl.style.display = '';
       }
+      this.applyFilters();
       var noPolling = new URLSearchParams(location.search).get('polling') === 'false';
       this.fetchStatus();
       this.loadSysInfo();
@@ -166,11 +167,13 @@ function app() {
 
     toggleGrayscale() {
       this.active.grayscale = !this.active.grayscale;
+      localStorage.setItem('filterGrayscale', this.active.grayscale);
       this.applyFilters();
     },
 
     toggleInvert() {
       this.active.invert = !this.active.invert;
+      localStorage.setItem('filterInvert', this.active.invert);
       this.applyFilters();
     },
 

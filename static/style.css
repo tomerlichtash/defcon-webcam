@@ -5,7 +5,7 @@
 
 :root { --pico-font-family: 'Exo 2', -apple-system, sans-serif; }
 
-.container-fluid { padding-top: 0; max-width: 1600px; margin: 0 auto; }
+.container-fluid { padding-top: 0; max-width: 2200px; margin: 0 auto; }
 nav { margin-top: 0; padding-top: 4px; }
 
 /* ---- Main layout ---- */
