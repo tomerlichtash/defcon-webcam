@@ -15,7 +15,8 @@ Camera surveillance system running on a Raspberry Pi with a Logitech BRIO webcam
 - **Telegram integration**: sends camera snapshots to a Telegram group on DEFCON 2 alerts
 - **Manual publish**: publish snapshots to selected targets (Telegram, Twitter) from the web UI
 - **Persistent alert state**: survives service restarts
-- **Web control panel** on port 8081 with live system monitoring
+- **Unified event log**: SQLite-backed, 24h rolling window, all events in one timeline
+- **Web control panel** on port 8081 with live system monitoring, event log with filters and pagination
 
 ## Project Structure
 
@@ -33,7 +34,9 @@ Camera surveillance system running on a Raspberry Pi with a Logitech BRIO webcam
     │   ├── camera.py          # Snapshot helpers
     │   ├── twitter.py         # Twitter/X posting
     │   ├── telegram.py        # Telegram Bot API posting
-    │   └── sysinfo.py         # System info for web UI
+    │   ├── sysinfo.py         # System info for web UI
+    │   ├── event_log.py       # Unified event log (SQLite)
+    │   └── alert_log.py       # Alert/scan logging (dual-writes to event log)
     ├── templates/
     │   └── index.html         # Web UI template
     ├── static/
@@ -124,6 +127,23 @@ Camera surveillance system running on a Raspberry Pi with a Logitech BRIO webcam
     mjpg-ctl zoom 100-500           # Set zoom
     mjpg-ctl status                 # Show current settings
 
+### Web API
+
+    curl 'http://pi:8081/api?cmd=defcon+2'    # Set DEFCON 2 (starts camera, sets OSD)
+    curl 'http://pi:8081/api?cmd=defcon+4'    # Set DEFCON 4 (starts camera, sets OSD)
+    curl 'http://pi:8081/api?cmd=defcon+5'    # Set DEFCON 5 (stops camera, clears OSD)
+    curl 'http://pi:8081/api?cmd=eventlog'    # Fetch event log (supports &since= and &offset=)
+    curl 'http://pi:8081/api?cmd=sysinfo'     # System info (services, CPU, temp, defcon)
+    curl 'http://pi:8081/api?cmd=dbreset'     # Clear event log database
+
+### Testing DEFCON states
+
+    # Set DEFCON 2 (starts camera, sets OSD to "INCOMING MISSILES", logs alert)
+    curl 'http://10.0.0.238:8081/api?cmd=defcon+2'
+
+    # Set DEFCON 5 (stops camera, sets OSD to "CLEAR SKIES", logs alert)
+    curl 'http://10.0.0.238:8081/api?cmd=defcon+5'
+
 ## Testing
 
     python -m unittest discover -s tests -v
@@ -148,3 +168,24 @@ State transitions:
 On DEFCON 2, after a 15-second confirmation delay, snapshots are posted to Twitter and Telegram.
 
 State is persisted to `/tmp/mjpg-alert-state` so restarts don't lose DEFCON status.
+
+## Event Log
+
+All events (alerts, scans, commands, service state changes, temperature warnings) are stored in a SQLite database at `/tmp/defcon-events.db`. The log keeps a 24-hour rolling window, pruned hourly.
+
+Event types:
+- **alert** — DEFCON state changes (from real alerts or manual `defcon` API command)
+- **scan** — API poll results from mjpg-alert
+- **status** — Commands executed, service restarts, publish actions
+- **system** — Service state changes, DEFCON transitions, temperature warnings
+
+The web UI displays the event log with filter toggles and a "Load More" button for pagination. Events are fetched incrementally (only new events since last poll).
+
+## OSD Labels
+
+The ffmpeg overlay shows friendly labels instead of DEFCON codes:
+- **DEFCON 5**: `CLEAR SKIES`
+- **DEFCON 4**: `INCOMING ALERT - HH:MM:SS`
+- **DEFCON 2**: `INCOMING MISSILES - HH:MM:SS`
+
+The web UI header shows the technical label: `DEFCON 5` / `DEFCON 4` / `DEFCON 2`.

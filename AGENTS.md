@@ -29,6 +29,9 @@ DefconCam is a Raspberry Pi camera surveillance system with missile alert monito
       ├── imports → lib/camera (take_snapshot for publish)
       ├── imports → lib/telegram (send_telegram for publish)
       ├── imports → lib/twitter (send_tweet for publish)
+      ├── imports → lib/event_log (unified SQLite event log)
+      ├── imports → lib/state (save_state, set_display for defcon command)
+      ├── imports → lib/alert_log (log_event for defcon command)
       └── calls → mjpg-ctl via subprocess (camera controls)
 
 ## Module Structure (lib/)
@@ -39,7 +42,9 @@ DefconCam is a Raspberry Pi camera surveillance system with missile alert monito
 - `camera.py` — `take_snapshot()` (simple grab) and `take_alert_snapshot(mode)` (with night exposure)
 - `twitter.py` — `send_tweet(text)` (uses existing snapshot) and `post_tweet(text, mode)` (takes snapshot + posts)
 - `telegram.py` — `send_telegram(text)` (uses existing snapshot) and `post_telegram(text, mode)` (takes snapshot + posts)
-- `sysinfo.py` — System info gathering (services, uptime, CPU%, temp, DEFCON state) for web UI
+- `sysinfo.py` — System info gathering (services, uptime, CPU%, temp, DEFCON state, DB size) for web UI
+- `event_log.py` — Unified event log backed by SQLite (`/tmp/defcon-events.db`). 24h rolling window, pruned hourly. Functions: `log_event()`, `load_events()`, `count_events()`, `prune()`, `reset_db()`, `init_db()`
+- `alert_log.py` — Alert/scan logging. Dual-writes to both legacy JSON files and unified event log via `_unified_log()`
 
 ### Import Pattern
 Scripts in `bin/` use `os.path.realpath(__file__)` to resolve symlinks back to the repo, then `sys.path.insert(0, _root)` to enable `from lib import ...`.
@@ -62,11 +67,27 @@ All scripts in `bin/` are symlinked to `/usr/local/bin/`. Do not edit files in `
 - Only transition back to idle on explicit "האירוע הסתיים" from the API. Empty API response does NOT clear the alert.
 - State is persisted to `/tmp/mjpg-alert-state`. Always read it on startup to survive restarts.
 
-### OSD Text Files
+### OSD Labels
 - Files: `/tmp/mjpg-idle.txt`, `/tmp/mjpg-alert.txt`, `/tmp/mjpg-clear.txt`, `/tmp/mjpg-osd.txt`
 - These MUST exist before ffmpeg starts or it will crash.
 - Write a space `" "` to clear a file, never write empty string `""` — ffmpeg's textfile reload ignores empty files.
 - `mjpg-rotated.sh` creates these on startup as a safety net.
+- OSD shows friendly labels: `CLEAR SKIES` (DEFCON 5), `INCOMING ALERT - HH:MM:SS` (DEFCON 4), `INCOMING MISSILES - HH:MM:SS` (DEFCON 2).
+- Web UI header shows the technical label: `DEFCON 5` / `DEFCON 4` / `DEFCON 2`.
+
+### Unified Event Log
+- All events stored in SQLite at `/tmp/defcon-events.db` (survives page refreshes, not reboots).
+- Event types: `alert`, `scan`, `status`, `system`.
+- `mjpg-web` logs commands, service restarts, publishes, and detects sysinfo state changes (service transitions, DEFCON changes, temp warnings).
+- `mjpg-alert` dual-writes via `alert_log.py` → `_unified_log()` → `event_log.log_event()`.
+- Client fetches incrementally (`&since=` param), with pagination (`&offset=` param, 200 per page).
+- Pruning: background thread in `mjpg-web` runs hourly, removes entries older than 24h.
+- Reset: `dbreset` API command clears all events and vacuums the DB.
+
+### DEFCON API Command
+- `defcon [2|4|5]` command in `mjpg-web` sets state, writes OSD, logs alert, and starts/stops camera.
+- Does NOT post to Twitter/Telegram (unlike real alerts via `mjpg-alert`).
+- Useful for testing: `curl 'http://10.0.0.238:8081/api?cmd=defcon+2'`
 
 ### ffmpeg Filter Gotchas
 - Uses `textfile` with `reload=1` for dynamic OSD content — colons in the text file content are fine.
@@ -125,3 +146,4 @@ All scripts in `bin/` are symlinked to `/usr/local/bin/`. Do not edit files in `
 - `/etc/mjpg-next-switch` — next day/night switch time
 - `/tmp/mjpg-alert-state` — persisted DEFCON state
 - `/tmp/mjpg-*.txt` — OSD text files
+- `/tmp/defcon-events.db` — unified event log (SQLite)

@@ -13,16 +13,66 @@ import sys
 sys.path.insert(0, _root)
 
 from lib.sysinfo import get_sysinfo
-from lib.alert_log import load_log, load_scan_log
+from lib.alert_log import load_log, load_scan_log, log_event as alert_log_event
 from lib.camera import take_snapshot
+from lib.state import save_state, set_display
+from lib.event_log import log_event, load_events, count_events, prune, reset_db, init_db, migrate_from_jsonl
 
+
+import threading
+import time as _time
 
 PORT = 8081
+
+# Server-side state tracking for change detection
+_prev_state = {"services": {}, "defcon": None, "temp": None}
+_prune_interval = 3600  # prune every hour
 STATIC_DIR = os.path.join(_root, "static")
 TEMPLATE_DIR = os.path.join(_root, "templates")
 
 with open(os.path.join(TEMPLATE_DIR, "index.html")) as f:
     HTML_TEMPLATE = f.read()
+
+
+def _detect_changes(info):
+    """Compare sysinfo against previous state and log changes."""
+    global _prev_state
+
+    # Service state changes
+    svcs = info.get("services", {})
+    for name, state in svcs.items():
+        prev = _prev_state["services"].get(name)
+        if prev and prev != state:
+            log_event("system", label=name, value=state)
+    _prev_state["services"] = dict(svcs)
+
+    # DEFCON changes
+    defcon = info.get("defcon")
+    if defcon and defcon != _prev_state["defcon"]:
+        if _prev_state["defcon"] is not None:
+            log_event("system", label="defcon", value=defcon)
+        _prev_state["defcon"] = defcon
+
+    # Temperature warnings
+    temp_str = info.get("temp")
+    if temp_str:
+        try:
+            deg = float(temp_str.replace("°", ""))
+        except ValueError:
+            deg = 0
+        prev_deg = _prev_state.get("temp") or 0
+        if deg >= 70 and prev_deg < 70:
+            log_event("system", label="temp", value=f"{temp_str} (high)")
+        if deg >= 80 and prev_deg < 80:
+            log_event("system", label="temp", value=f"{temp_str} (critical)")
+        _prev_state["temp"] = deg
+
+
+def _prune_thread():
+    """Periodically prune old events."""
+    while True:
+        _time.sleep(_prune_interval)
+        prune()
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -31,6 +81,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
             query = urllib.parse.urlparse(self.path).query
             params = urllib.parse.parse_qs(query)
             cmd = params.get('cmd', ['status'])[0]
+
+            if cmd == 'dbreset':
+                reset_db()
+                log_event("status", message="Event log cleared")
+                self._json_response({"output": "Event log cleared"})
+                return
+
+            if cmd == 'eventlog':
+                since = params.get('since', [None])[0]
+                offset = int(params.get('offset', [0])[0])
+                events = load_events(since=since, offset=offset)
+                total = count_events()
+                info = get_sysinfo()
+                _detect_changes(info)
+                self._json_response({'log': events, 'total': total, 'defcon': info.get('defcon')})
+                return
 
             if cmd == 'alertlog':
                 self._json_response({'log': load_log()})
@@ -41,10 +107,64 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return
 
             if cmd == 'sysinfo':
-                self._json_response({"sysinfo": get_sysinfo()})
+                info = get_sysinfo()
+                # Detect and log state changes
+                _detect_changes(info)
+                self._json_response({"sysinfo": info})
+                return
+
+
+            if cmd.startswith('svcctl '):
+                parts = cmd.split()
+                if len(parts) == 3:
+                    action, svc = parts[1], parts[2]
+                    allowed_svcs = {'mjpg-alert', 'mjpg-streamer', 'mjpg-web'}
+                    if action in ('restart', 'start') and svc in allowed_svcs:
+                        log_event('status', message=f"{action.title()}ing {svc}...")
+                        if svc == 'mjpg-web':
+                            self._json_response({"output": f"Restarting {svc}..."})
+                            subprocess.Popen(['sudo', 'systemctl', 'restart', svc], close_fds=True)
+                            return
+                        r = subprocess.run(['sudo', 'systemctl', action, svc],
+                                           capture_output=True, text=True, timeout=15)
+                        out = (r.stdout + r.stderr).strip() or f'{svc} {action} OK'
+                        log_event('status', message=out)
+                        self._json_response({"output": out})
+                        return
+
+            if cmd.startswith('defcon '):
+                level = cmd.split()[1]
+                ts = _time.strftime("%H:%M:%S")
+                if level == '2':
+                    save_state('defcon2')
+                    set_display(alert='INCOMING MISSILES - ' + ts)
+                    alert_log_event('DEFCON 2', {'source': 'manual', 'alert': True})
+                    log_event('status', message='DEFCON 2 set manually')
+                    subprocess.run(['sudo', 'systemctl', 'start', 'mjpg-streamer'],
+                                   capture_output=True, text=True, timeout=15)
+                    self._json_response({"output": "DEFCON 2 - INCOMING MISSILES"})
+                elif level == '4':
+                    save_state('defcon4')
+                    set_display(defcon4='INCOMING ALERT - ' + ts)
+                    alert_log_event('DEFCON 4', {'source': 'manual', 'alert': True})
+                    log_event('status', message='DEFCON 4 set manually')
+                    subprocess.run(['sudo', 'systemctl', 'start', 'mjpg-streamer'],
+                                   capture_output=True, text=True, timeout=15)
+                    self._json_response({"output": "DEFCON 4 - INCOMING ALERT"})
+                elif level == '5':
+                    save_state('idle')
+                    set_display(idle='CLEAR SKIES')
+                    alert_log_event('DEFCON 5', None)
+                    log_event('status', message='DEFCON 5 set manually')
+                    subprocess.run(['sudo', 'systemctl', 'stop', 'mjpg-streamer'],
+                                   capture_output=True, text=True, timeout=15)
+                    self._json_response({"output": "DEFCON 5 - CLEAR SKIES"})
+                else:
+                    self._json_response({"error": "invalid defcon level"})
                 return
 
             if cmd == 'restart-web':
+                log_event('status', message="Restarting web server...")
                 self._json_response({"output": "Restarting web server..."})
                 subprocess.Popen(['sudo', 'systemctl', 'restart', 'mjpg-web'],
                                  close_fds=True)
@@ -53,9 +173,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if cmd.startswith('camctl '):
                 action = cmd.split()[1]
                 if action in ('start', 'stop', 'restart'):
+                    log_event('status', message=f"Camera {action}...")
                     r = subprocess.run(['sudo', 'systemctl', action, 'mjpg-streamer'],
                                        capture_output=True, text=True, timeout=15)
                     out = (r.stdout + r.stderr).strip() or f'Camera {action} OK'
+                    log_event('status', message=out)
                     self._json_response({"output": out})
                     return
 
@@ -68,9 +190,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return
 
             parts = cmd.split()
+            if cmd != 'status':
+                log_event('status', message=f"Command: {cmd}")
             result = subprocess.run(['/usr/local/bin/mjpg-ctl'] + parts,
                                     capture_output=True, text=True, timeout=30)
             output = (result.stdout + result.stderr).strip()
+            if cmd != 'status' and output:
+                log_event('status', message=output)
             self._json_response({"output": output})
 
         elif self.path.startswith('/static/'):
@@ -108,9 +234,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             targets = data.get('targets', [])
             caption = data.get('caption', 'Stars Outside')
             results = {}
+            log_event('status', message=f"Publishing to {', '.join(targets)}...")
             try:
                 take_snapshot()
             except Exception as e:
+                log_event('status', message=f"Snapshot error: {e}")
                 self._json_response({"results": {"snapshot": str(e)}})
                 return
             for t in targets:
@@ -128,6 +256,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         results['twitter'] = 'ok'
                     except Exception as e:
                         results['twitter'] = str(e)
+            pub_summary = ', '.join(f"{k}: {v}" for k, v in results.items())
+            log_event('status', message=f"Published: {pub_summary}")
             self._json_response({"results": results})
         else:
             self.send_response(404)
@@ -145,6 +275,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
+    # Initialize SQLite database
+    init_db()
+    # Migrate from JSONL if it exists (one-time)
+    migrated = migrate_from_jsonl()
+    if migrated:
+        print(f"Migrated {migrated} events from JSONL to SQLite")
+    prune()
+    log_event("status", message="Web server started")
+
+    # Start background pruning thread
+    t = threading.Thread(target=_prune_thread, daemon=True)
+    t.start()
+
     server = http.server.HTTPServer(('0.0.0.0', PORT), Handler)
     print(f"Control panel running on http://0.0.0.0:{PORT}")
     server.serve_forever()

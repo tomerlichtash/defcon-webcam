@@ -1,126 +1,216 @@
 <!DOCTYPE html>
-<html>
+<html data-theme="dark">
 <head>
 <title>Stars Outside - Camera Control Panel</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/static/style.css?v=3">
+<link rel="stylesheet" href="/static/pico.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<script defer src="/static/alpine.min.js"></script>
 </head>
-<body>
-<div class="container">
-  <div class="status-bar" id="status-bar">
-    <span class="title">✨ Stars Outside</span>
-    <span class="item" id="sb-uptime">Uptime: ...</span>
-    <span class="item" id="sb-load">Load: ...</span>
-    <span class="item" id="sb-temp">Temp: ...</span>
-    <span class="item" id="sb-services">Services: ...</span>
-  </div>
+<body x-data="app()" x-init="init()">
+<main class="container-fluid">
+  <nav>
+    <ul>
+      <li><strong class="site-title">✨ Stars Outside &nbsp;|&nbsp; <span class="defcon-label" :class="{'siren': defcon === 'DEFCON 2'}" :style="{color: defconColor}" x-text="defconLabel">CLEAR SKIES</span></strong> <span class="status-bar" x-show="status" x-text="status"></span></li>
+    </ul>
+    <ul>
+      <li x-show="camOn"><button class="cam-toggle-btn refocus-btn" @click="publish()">PUBLISH</button></li>
+      <li x-show="camOn"><button class="cam-toggle-btn refocus-btn" @click="cmd('focus')">FOCUS</button></li>
+      <li><button class="cam-toggle-btn" :class="(camOn && !camHover) || (!camOn && camHover) ? 'on' : 'off'"
+                   @click="camCtl(camOn ? 'stop' : 'start')" :disabled="camLoading"
+                   @mouseenter="camHover = true" @mouseleave="camHover = false"
+><span x-show="!camLoading" x-text="camHover ? (camOn ? 'TURN OFF' : 'TURN ON') : (camOn ? 'CAMERA ON' : 'CAMERA OFF')"></span><span x-show="camLoading" class="cam-spinner"></span></button></li>
+    </ul>
+  </nav>
+
   <div class="main-layout">
-    <div class="stream-area">
-      <img id="stream" src="http://__HOST__:8080/?action=stream" alt="Camera Stream">
-      <div class="empty-state" id="stream-empty"><div style="text-align:center"><div>Camera Off</div><button class="btn" style="margin-top:12px" onclick="camCtl('start')">Turn On</button></div></div>
-      <div id="status"></div>
+    <div class="stream-col">
+      <img id="stream" alt="Camera Stream"
+           class="stream-img" style="display:none">
+      <article x-show="!camOn" class="empty-state">
+        <div>
+          <p>Sky is clear!</p>
+          <button class="outline" @click="camCtl('start')">Take a look</button>
+        </div>
+      </article>
+      <p class="status-text" x-show="camOn && pubStatus" x-text="pubStatus"></p>
+      <p class="stream-stats" x-show="camOn && streamStats" x-text="streamStats"></p>
+
+      <div class="agg-log-panel">
+        <div class="agg-log-header" :style="panels.eventLog ? '' : 'padding-bottom:0;margin-bottom:0'" @click="panels.eventLog = !panels.eventLog">
+          <span class="agg-log-title">Event Log <span x-html="panels.eventLog ? '&#9662;' : '&#9656;'"></span></span>
+          <div class="agg-log-filters" @click.stop>
+            <button class="agg-filter" :class="filters.alerts ? 'active' : ''" @click="filters.alerts = !filters.alerts">Alerts</button>
+            <button class="agg-filter" :class="filters.scans ? 'active' : ''" @click="filters.scans = !filters.scans">Scans</button>
+            <button class="agg-filter" :class="filters.status ? 'active' : ''" @click="filters.status = !filters.status">Status</button>
+            <button class="agg-filter" :class="filters.system ? 'active' : ''" @click="filters.system = !filters.system">System</button>
+          </div>
+        </div>
+        <div x-show="panels.eventLog" class="log-columns-header">
+          <span></span>
+          <span>Type</span>
+          <span>Time</span>
+          <span>Details</span>
+        </div>
+        <div x-show="panels.eventLog" class="log-entries">
+          <template x-if="aggLog.length === 0">
+            <p><small>No events recorded</small></p>
+          </template>
+          <template x-for="(e, idx) in aggLog" :key="idx">
+            <div class="log-entry" :class="'type-' + e._type" @click="e._open = !e._open">
+              <span class="log-type" x-text="e._type"></span>
+              <span x-text="e.time || ''" class="log-time"></span>
+              <span class="log-content">
+                <template x-if="e._type === 'alert'">
+                  <span class="log-badge" :class="e.defcon==='DEFCON 2'?'d2':e.defcon==='DEFCON 4'?'d4':'d5'"
+                        x-text="e.defcon"></span>
+                </template>
+                <template x-if="e._type === 'scan'">
+                  <span x-text="(e.source || 'scan') + ' (' + (e.result || 'clear') + ')'"></span>
+                </template>
+                <template x-if="e._type === 'status'">
+                  <span x-text="e.message"></span>
+                </template>
+                <template x-if="e._type === 'system'">
+                  <span><span class="log-label" x-text="e.label"></span> <span x-text="e.value"></span></span>
+                </template>
+                <span x-show="e.source && e._type !== 'scan'" x-text="e.source" class="log-source"></span>
+              </span>
+              <pre x-show="e._open && (e.raw || e.data)" x-text="e.raw ? JSON.stringify(e.raw, null, 2) : e.data"></pre>
+            </div>
+          </template>
+          <template x-if="eventLog.length < eventTotal">
+            <div class="load-more">
+              <button class="outline load-more-btn" @click="loadMore()" :disabled="loadingMore"
+                      x-text="loadingMore ? 'Loading...' : 'Load More'"></button>
+            </div>
+          </template>
+        </div>
+      </div>
     </div>
+
     <div class="sidebar">
-      <div class="panel">
-        <div class="defcon-panel" id="defcon-state">DEFCON 5</div>
-      </div>
-      <div class="panel">
-        <h3>Mode</h3>
-        <div class="btn-group" data-group="mode">
-          <button class="btn" data-val="day" onclick="cmd('day')">Day</button>
-          <button class="btn" data-val="night" onclick="cmd('night')">Night</button>
-          <button class="btn" data-val="indoor" onclick="cmd('indoor')">Indoor</button>
+      <article>
+        <header @click="panels.sysinfo = !panels.sysinfo">
+          System <span x-html="panels.sysinfo ? '&#9662;' : '&#9656;'"></span>
+        </header>
+        <div x-show="panels.sysinfo" class="control-group" style="padding-bottom:10px">
+          <div class="sysinfo-section">
+            <div class="sysinfo-row">
+              <span class="sysinfo-label">Uptime</span>
+              <span x-text="sys.uptime"></span>
+            </div>
+          </div>
+          <div class="sysinfo-section">
+            <div class="sysinfo-row">
+              <span class="sysinfo-label">CPU</span>
+              <span class="spark-value"><span x-html="cpuSpark"></span><span :style="{color: cpuColor}" x-text="sys.load"></span></span>
+            </div>
+          </div>
+          <div class="sysinfo-section">
+            <div class="sysinfo-row">
+              <span class="sysinfo-label">Temp</span>
+              <span class="spark-value"><span x-html="tempSpark"></span><span :style="{color: tempColor}" x-text="sys.temp"></span></span>
+            </div>
+          </div>
+          <div class="svc-row" style="margin-top:6px">
+            <span class="svc-dot" :class="webRestarting ? 'down' : noPolling ? 'warn' : 'up'"></span>
+            <span class="sysinfo-label">Web</span>
+            <button class="outline btn-danger svc-restart-btn" @click="restartServer()">Restart</button>
+          </div>
+          <div class="svc-row">
+            <span class="svc-dot" :class="sys.dbOk ? 'up' : 'down'"></span>
+            <span class="sysinfo-label">DB <small x-text="'(' + sys.dbSize + ')'" style="opacity:0.6"></small></span>
+            <button class="outline btn-danger svc-restart-btn" @click="dbReset()">Reset</button>
+          </div>
+          <div x-html="servicesRows"></div>
         </div>
-      </div>
-      <div class="panel">
-        <h3>Resolution</h3>
-        <div class="btn-group" data-group="res">
-          <button class="btn" data-val="low" onclick="cmd('res low')">480p</button>
-          <button class="btn" data-val="mid" onclick="cmd('res mid')">720p</button>
-          <button class="btn" data-val="high" onclick="cmd('res high')">1080p</button>
+      </article>
+
+      <article>
+        <header @click="panels.image = !panels.image">
+          Camera <span x-html="panels.image ? '&#9662;' : '&#9656;'"></span>
+        </header>
+        <div x-show="panels.image" :class="{'controls-disabled': !camOn}" class="settings-panel">
+          <div class="setting-row">
+            <span class="sysinfo-label">Mode</span>
+            <div role="group">
+              <template x-for="m in ['day','night']">
+                <button :class="active.mode === m ? '' : 'outline'"
+                        @click="cmd(m)" x-text="m[0].toUpperCase() + m.slice(1)"></button>
+              </template>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label">Resolution</span>
+            <div role="group">
+              <template x-for="r in [{val:'low',label:'480p'},{val:'mid',label:'720p'},{val:'high',label:'1080p'}]">
+                <button :class="active.res === r.val ? '' : 'outline'"
+                        @click="cmd('res ' + r.val)" x-text="r.label"></button>
+              </template>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label">FPS</span>
+            <div role="group">
+              <template x-for="f in ['5','10','15','24','30']">
+                <button :class="active.fps === f ? '' : 'outline'"
+                        @click="cmd('fps ' + f)" x-text="f"></button>
+              </template>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label">Brightness <small x-text="bright"></small></span>
+            <input type="range" min="0" max="100" x-model="bright"
+                   @change="cmd('bright ' + bright)">
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label">Rotation</span>
+            <div role="group">
+              <template x-for="r in ['0','90','180','270']">
+                <button :class="active.rotation === r ? '' : 'outline'"
+                        @click="cmd('rotate ' + r)" x-html="r + '&deg;'"></button>
+              </template>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label">Zoom <small x-text="zoom"></small></span>
+            <input type="range" min="100" max="500" step="10" x-model="zoom"
+                   @change="cmd('zoom ' + zoom)">
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label">Filters</span>
+            <div role="group">
+              <button :class="cssGrayscale ? '' : 'outline'"
+                      @click="toggleGrayscale()">Grayscale</button>
+              <button :class="cssInvert ? '' : 'outline'"
+                      @click="toggleInvert()">Invert</button>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="panel">
-        <h3>Rotation</h3>
-        <div class="btn-group" data-group="rotation">
-          <button class="btn" data-val="0" onclick="cmd('rotate 0')">0&deg;</button>
-          <button class="btn" data-val="90" onclick="cmd('rotate 90')">90&deg;</button>
-          <button class="btn" data-val="180" onclick="cmd('rotate 180')">180&deg;</button>
-          <button class="btn" data-val="270" onclick="cmd('rotate 270')">270&deg;</button>
+      </article>
+
+      <article>
+        <header @click="panels.publish = !panels.publish">
+          Channels <span x-html="panels.publish ? '&#9662;' : '&#9656;'"></span>
+        </header>
+        <div x-show="panels.publish" class="settings-panel">
+          <div class="setting-row">
+            <span class="sysinfo-label">Telegram</span>
+            <input type="checkbox" x-model="pubTelegram">
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label">Twitter</span>
+            <input type="checkbox" x-model="pubTwitter">
+          </div>
         </div>
-      </div>
-      <div class="panel">
-        <h3>FPS</h3>
-        <div class="btn-group" data-group="fps">
-          <button class="btn" data-val="5" onclick="cmd('fps 5')">5</button>
-          <button class="btn" data-val="10" onclick="cmd('fps 10')">10</button>
-          <button class="btn" data-val="15" onclick="cmd('fps 15')">15</button>
-          <button class="btn" data-val="24" onclick="cmd('fps 24')">24</button>
-          <button class="btn" data-val="30" onclick="cmd('fps 30')">30</button>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>Brightness</h3>
-        <div class="slider-row">
-          <label>Level</label>
-          <input type="range" id="bright" min="0" max="100" value="58" oninput="sliderUpdate('bright',this.value)" onchange="cmd('bright '+this.value)">
-          <span class="val" id="bright-val">58</span>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>Zoom</h3>
-        <div class="slider-row">
-          <label>Level</label>
-          <input type="range" id="zoom" min="100" max="500" value="100" step="10" oninput="sliderUpdate('zoom',this.value)" onchange="cmd('zoom '+this.value)">
-          <span class="val" id="zoom-val">100</span>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>Focus</h3>
-        <div><button class="btn" onclick="cmd('focus')">Refocus</button></div>
-      </div>
-      <div class="panel">
-        <h3>Camera</h3>
-        <div class="btn-group">
-          <button class="btn" id="cam-toggle" onclick="camToggle()">...</button>
-          <button class="btn" onclick="camCtl('restart')">Restart</button>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>Publish</h3>
-        <div class="cb-row">
-          <input type="checkbox" id="pub-telegram" checked>
-          <label for="pub-telegram">Telegram</label>
-        </div>
-        <div class="cb-row">
-          <input type="checkbox" id="pub-twitter">
-          <label for="pub-twitter">Twitter</label>
-        </div>
-        <div style="margin-top: 8px;">
-          <button class="btn" onclick="publish()">Publish Snapshot</button>
-        </div>
-        <div class="publish-status" id="pub-status"></div>
-      </div>
-      <div class="panel">
-        <h3>Server</h3>
-        <div class="btn-group">
-          <button class="btn" onclick="restartServer()">Restart Web UI</button>
-        </div>
-      </div>
+      </article>
+
     </div>
   </div>
-  <div class="logs-row">
-    <div class="log-panel">
-      <h3 onclick="toggleLog()">Alert Log <span class="toggle" id="log-toggle">&#9650;</span></h3>
-      <div id="log-entries" class="log-entries"></div>
-    </div>
-    <div class="log-panel">
-      <h3 onclick="toggleScanLog()">Scanner Log <span class="toggle" id="scan-toggle">&#9650;</span></h3>
-      <div id="scan-entries" class="log-entries"></div>
-    </div>
-  </div>
-</div>
-<script src="/static/app.js?v=3"></script>
+</main>
+<footer class="site-footer">Coded under fire by Tomer Lichtash</footer>
+<script src="/static/app.js"></script>
 </body>
 </html>
