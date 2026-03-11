@@ -5,6 +5,9 @@
 
 :root { --pico-font-family: 'Exo 2', -apple-system, sans-serif; }
 
+.container-fluid { padding-top: 0; max-width: 1600px; margin: 0 auto; }
+nav { margin-top: 0; padding-top: 4px; }
+
 /* ---- Main layout ---- */
 .main-layout { display: flex; gap: 12px; }
 .stream-col { flex: 1; min-width: 0; }
@@ -21,11 +24,8 @@
 .overlay-btn.off { color: #e94560; border-color: #e94560; }
 /* ---- Status bar (fixed footer) ---- */
 .status-bar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  background: rgba(0,0,0,0.85); backdrop-filter: blur(6px);
-  color: var(--pico-color); font-size: 0.75em;
-  padding: 4px 16px; text-align: center;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-size: 0.6em; font-weight: normal; color: var(--pico-muted-color);
+  margin-left: 10px;
 }
 
 /* Below stream (publish, server) */
@@ -82,6 +82,7 @@
 
 /* ---- Title ---- */
 .site-title { text-transform: uppercase; }
+.site-footer { text-align: center; font-size: 0.7em; color: var(--pico-muted-color); padding: 10px 0; position: fixed; bottom: 0; left: 0; right: 0; }
 
 /* ---- DEFCON ---- */
 .defcon-label { display: inline-block; }
@@ -159,7 +160,7 @@ nav { overflow: visible; }
 
 /* ---- Aggregated log panel ---- */
 .agg-log-panel { margin-top: 12px; border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius); padding: 0 12px 10px; }
-.agg-log-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--pico-muted-border-color); margin-bottom: 4px; }
+.agg-log-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; margin-bottom: 4px; cursor: pointer; }
 .agg-log-title { font-size: 0.78em; text-transform: uppercase; font-weight: bold; letter-spacing: 0.03em; color: var(--pico-color); }
 .agg-log-filters { display: flex; align-items: center; gap: 6px; }
 .agg-filter { font-size: 0.65em; padding: 0.15em 0.5em; border-radius: 10px; border: 1px solid var(--pico-muted-border-color); background: none; color: var(--pico-muted-color); cursor: pointer; transition: all 0.15s; margin: 0; }

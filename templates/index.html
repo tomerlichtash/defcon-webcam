@@ -9,10 +9,10 @@
 <script defer src="/static/alpine.min.js"></script>
 </head>
 <body x-data="app()" x-init="init()">
-<main class="container">
+<main class="container-fluid">
   <nav>
     <ul>
-      <li><strong class="site-title">✨ Stars Outside: <span class="defcon-label" :class="{'siren': defcon === 'DEFCON 2'}" :style="{color: defconColor}" x-text="defcon">DEFCON 5</span></strong></li>
+      <li><strong class="site-title">✨ Stars Outside: <span class="defcon-label" :class="{'siren': defcon === 'DEFCON 2'}" :style="{color: defconColor}" x-text="defcon">DEFCON 5</span></strong> <span class="status-bar" x-show="status" x-text="status"></span></li>
     </ul>
     <ul>
       <li x-show="camOn"><button class="cam-toggle-btn refocus-btn" @click="cmd('focus')">FOCUS</button></li>
@@ -28,30 +28,30 @@
            x-show="camOn" class="stream-img">
       <article x-show="!camOn" class="empty-state">
         <div>
-          <p>Camera Off</p>
-          <button class="outline" @click="camCtl('start')">Turn On</button>
+          <p>Sky is clear!</p>
+          <button class="outline" @click="camCtl('start')">Take a look</button>
         </div>
       </article>
       <button class="publish-btn" x-show="camOn" @click="publish()" style="margin-top:8px; padding:0.6em 0.8em">Publish Snapshot</button>
       <p class="status-text" x-show="camOn && pubStatus" x-text="pubStatus"></p>
 
       <div class="agg-log-panel">
-        <div class="agg-log-header">
-          <span class="agg-log-title">Event Log</span>
-          <div class="agg-log-filters">
+        <div class="agg-log-header" :style="panels.eventLog ? '' : 'padding-bottom:0;margin-bottom:0'" @click="panels.eventLog = !panels.eventLog">
+          <span class="agg-log-title">Event Log <span x-html="panels.eventLog ? '&#9662;' : '&#9656;'"></span></span>
+          <div class="agg-log-filters" @click.stop>
             <button class="agg-filter" :class="filters.alerts ? 'active' : ''" @click="filters.alerts = !filters.alerts">Alerts</button>
             <button class="agg-filter" :class="filters.scans ? 'active' : ''" @click="filters.scans = !filters.scans">Scans</button>
             <button class="agg-filter" :class="filters.status ? 'active' : ''" @click="filters.status = !filters.status">Status</button>
             <button class="agg-filter" :class="filters.system ? 'active' : ''" @click="filters.system = !filters.system">System</button>
           </div>
         </div>
-        <div class="log-columns-header">
+        <div x-show="panels.eventLog" class="log-columns-header">
           <span></span>
           <span>Type</span>
           <span>Time</span>
           <span>Details</span>
         </div>
-        <div class="log-entries">
+        <div x-show="panels.eventLog" class="log-entries">
           <template x-if="aggLog.length === 0">
             <p><small>No events recorded</small></p>
           </template>
@@ -182,10 +182,10 @@
 
       <article>
         <header @click="panels.publish = !panels.publish">
-          Publish <span x-html="panels.publish ? '&#9662;' : '&#9656;'"></span>
+          General <span x-html="panels.publish ? '&#9662;' : '&#9656;'"></span>
         </header>
         <div x-show="panels.publish" class="control-group" style="padding-bottom:10px">
-          <label class="control-label">Targets</label>
+          <label class="control-label">Publish Targets</label>
           <label><input type="checkbox" x-model="pubTelegram"> Telegram</label>
           <label><input type="checkbox" x-model="pubTwitter"> Twitter</label>
         </div>
@@ -194,7 +194,7 @@
     </div>
   </div>
 </main>
-<footer class="status-bar" x-show="status" x-text="status"></footer>
+<footer class="site-footer">Coded under fire by Tomer Lichtash</footer>
 <script src="/static/app.js"></script>
 </body>
 </html>

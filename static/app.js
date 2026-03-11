@@ -16,7 +16,7 @@ function app() {
     loadingMore: false,
     noPolling: new URLSearchParams(location.search).get('polling') === 'false',
     webRestarting: false,
-    panels: JSON.parse(localStorage.getItem('panels') || '{"publish":false,"image":true,"advanced":false,"alertLog":false,"scanLog":false,"sysinfo":false,"services":false,"debug":false}'),
+    panels: Object.assign({"publish":false,"image":true,"advanced":false,"alertLog":false,"scanLog":false,"sysinfo":false,"services":false,"debug":false,"eventLog":true}, JSON.parse(localStorage.getItem('panels') || '{}')),
     streamSrc: '',
     sys: { uptime: 'Uptime: ...', load: '...', temp: '...', dbSize: '...', dbOk: false },
     services: {},
@@ -48,9 +48,13 @@ function app() {
       var keys = Object.keys(this.services);
       return keys.map(function(name) {
         var state = self.services[name];
-        var cls = state === 'active' ? 'up' : 'down';
-        var label = labels[name] || name;
-        var isDown = state !== 'active';
+        var isStarting = state === 'activating' || state === 'restarting';
+        var isStopping = state === 'deactivating';
+        var isTransitioning = isStarting || isStopping;
+        var cls = isTransitioning ? 'warn' : state === 'active' ? 'up' : 'down';
+        var suffix = isStarting ? ' <small style="opacity:0.6">(starting)</small>' : isStopping ? ' <small style="opacity:0.6">(stopping)</small>' : '';
+        var label = (labels[name] || name) + suffix;
+        var isDown = state !== 'active' && !isTransitioning;
         var btnClass = isDown ? 'outline btn-primary svc-restart-btn' : 'outline btn-danger svc-restart-btn';
         var btnLabel = isDown ? 'Start' : 'Restart';
         var action = isDown ? 'svcStart' : 'svcRestart';
@@ -179,14 +183,23 @@ function app() {
     /* Start, stop, or restart the camera service */
     camCtl(action) {
       this.status = 'Camera: ' + action + '...';
+      if (action === 'start' || action === 'restart') {
+        this.services['mjpg-streamer'] = 'activating';
+        this.services['ffmpeg'] = 'activating';
+      } else if (action === 'stop') {
+        this.services['mjpg-streamer'] = 'deactivating';
+        this.services['ffmpeg'] = 'deactivating';
+      }
+      var self = this;
       fetch('/api?cmd=camctl+' + action)
         .then(r => r.json())
         .then(d => {
-          this.status = d.output || 'Done';
-          this.loadSysInfo();
-          if (action !== 'stop') this.countdown(3);
+          self.status = d.output || 'Done';
+          if (action !== 'stop') self.countdown(3);
+          /* Delay sysinfo poll to let services fully start */
+          setTimeout(function() { self.loadSysInfo(); }, 3000);
         })
-        .catch(e => { this.status = 'Error: ' + e; });
+        .catch(e => { self.status = 'Error: ' + e; });
     },
 
     /* Restart the web server and reload */
@@ -259,21 +272,24 @@ function app() {
 
     /* Restart a systemd service */
     svcRestart(name) {
-      this.status = 'Restarting ' + name + '...';
-      this.services[name] = 'restarting';
+      var self = this;
+      self.status = 'Restarting ' + name + '...';
+      self.services[name] = 'restarting';
       fetch('/api?cmd=svcctl+restart+' + encodeURIComponent(name))
         .then(r => r.json())
-        .then(d => { this.status = d.output || 'Done'; this.loadSysInfo(); })
-        .catch(e => { this.status = 'Error: ' + e; });
+        .then(d => { self.status = d.output || 'Done'; setTimeout(function() { self.loadSysInfo(); }, 3000); })
+        .catch(e => { self.status = 'Error: ' + e; });
     },
 
     /* Start a stopped service */
     svcStart(name) {
-      this.status = 'Starting ' + name + '...';
+      var self = this;
+      self.status = 'Starting ' + name + '...';
+      self.services[name] = 'activating';
       fetch('/api?cmd=svcctl+start+' + encodeURIComponent(name))
         .then(r => r.json())
-        .then(d => { this.status = d.output || 'Done'; this.loadSysInfo(); })
-        .catch(e => { this.status = 'Error: ' + e; });
+        .then(d => { self.status = d.output || 'Done'; setTimeout(function() { self.loadSysInfo(); }, 3000); })
+        .catch(e => { self.status = 'Error: ' + e; });
     },
 
     /* Reset event log database */
