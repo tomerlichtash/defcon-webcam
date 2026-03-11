@@ -13,6 +13,7 @@ import sys
 sys.path.insert(0, _root)
 
 from lib.sysinfo import get_sysinfo
+from lib.alert_log import load_log, load_scan_log
 from lib.camera import take_snapshot
 
 
@@ -30,6 +31,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             query = urllib.parse.urlparse(self.path).query
             params = urllib.parse.parse_qs(query)
             cmd = params.get('cmd', ['status'])[0]
+
+            if cmd == 'alertlog':
+                self._json_response({'log': load_log()})
+                return
+
+            if cmd == 'scanlog':
+                self._json_response({'log': load_scan_log()})
+                return
 
             if cmd == 'sysinfo':
                 self._json_response({"sysinfo": get_sysinfo()})
@@ -65,7 +74,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json_response({"output": output})
 
         elif self.path.startswith('/static/'):
-            rel = self.path[len('/static/'):]
+            rel = self.path[len('/static/'):].split('?')[0]
             fpath = os.path.join(STATIC_DIR, rel)
             if os.path.isfile(fpath):
                 ext = os.path.splitext(fpath)[1]

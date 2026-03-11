@@ -13,6 +13,7 @@ from lib.config import CHECK_INTERVAL, WATCH_TERMS, get_current_mode
 from lib.state import state, save_state, load_state, set_display
 from lib import state as state_mod
 from lib.oref import check_alerts
+from lib.alert_log import log_event
 from lib.twitter import post_tweet
 from lib.telegram import post_telegram
 
@@ -55,12 +56,13 @@ def main():
         print("Starting in DEFCON 5", flush=True)
 
     while True:
-        result = check_alerts()
+        result, raw_data = check_alerts()
 
         if result == "ended":
             if state_mod.state != "idle":
                 ts = time.strftime("%H:%M:%S")
                 print("Event ended at " + ts + ", back to DEFCON 5", flush=True)
+                log_event("DEFCON 5", raw_data)
                 state_mod.state = "idle"
                 save_state("idle")
                 set_display(idle="DEFCON 5 -- CLEAR SKIES")
@@ -70,6 +72,7 @@ def main():
             if state_mod.state == "idle":
                 ts = time.strftime("%H:%M:%S")
                 print("DEFCON 4: preemptive alert - " + ts, flush=True)
+                log_event("DEFCON 4", raw_data)
                 state_mod.state = "defcon4"
                 save_state("defcon4")
                 set_display(defcon4="DEFCON 4 - ALERT INCOMING - " + ts)
@@ -81,6 +84,7 @@ def main():
                 ts = time.strftime("%H:%M:%S")
                 ts_tweet = time.strftime("%H:%M:%S")
                 print("DEFCON 2: incoming missiles - " + ts, flush=True)
+                log_event("DEFCON 2", raw_data)
                 state_mod.state = "defcon2"
                 save_state("defcon2")
                 set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
@@ -91,9 +95,10 @@ def main():
                 tweet_cancelled = False
                 for _ in range(5):
                     time.sleep(CHECK_INTERVAL)
-                    interim = check_alerts()
+                    interim, _ = check_alerts()
                     if interim == "ended":
                         print("State changed during tweet delay, cancelling tweet", flush=True)
+                        log_event("DEFCON 5", None)
                         state_mod.state = "idle"
                         save_state("idle")
                         set_display(idle="DEFCON 5 -- CLEAR SKIES")

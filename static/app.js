@@ -225,6 +225,46 @@ function publish() {
     .catch(function(e) { statusEl.textContent = 'Error: ' + e; });
 }
 
+
+/* Toggle alert log visibility */
+function toggleLog() {
+  var el = document.getElementById('log-entries');
+  var toggle = document.getElementById('log-toggle');
+  var hidden = el.style.display === 'none';
+  el.style.display = hidden ? 'block' : 'none';
+  toggle.innerHTML = hidden ? '&#9650;' : '&#9660;';
+  if (hidden) loadAlertLog();
+}
+
+/* Fetch and render the alert log */
+function loadAlertLog() {
+  fetch('/api?cmd=alertlog')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var log = d.log || [];
+      var el = document.getElementById('log-entries');
+      if (log.length === 0) {
+        el.innerHTML = '<div style="color:#555">No events recorded</div>';
+        return;
+      }
+      var html = '';
+      log.forEach(function(e) {
+        var cls = e.defcon === 'DEFCON 2' ? 'd2' : e.defcon === 'DEFCON 4' ? 'd4' : 'd5';
+        html += '<div class="log-entry">';
+        html += '<span class="log-time">' + e.time + '</span>';
+        html += '<span class="log-defcon ' + cls + '">' + e.defcon + '</span>';
+        if (e.raw) {
+          html += '<div class="log-raw"><details><summary>Raw data</summary>';
+          html += '<pre>' + JSON.stringify(e.raw, null, 2) + '</pre>';
+          html += '</details></div>';
+        }
+        html += '</div>';
+      });
+      el.innerHTML = html;
+    })
+    .catch(function() {});
+}
+
 /* Initial load: fetch camera status and start polling */
 fetch('/api?cmd=status')
   .then(function(r) { return r.json(); })
@@ -232,3 +272,45 @@ fetch('/api?cmd=status')
 
 loadSysInfo();
 setInterval(loadSysInfo, 5000);
+
+/* Toggle scanner log visibility */
+function toggleScanLog() {
+  var el = document.getElementById('scan-entries');
+  var toggle = document.getElementById('scan-toggle');
+  var hidden = el.style.display === 'none';
+  el.style.display = hidden ? 'block' : 'none';
+  toggle.innerHTML = hidden ? '&#9650;' : '&#9660;';
+  if (hidden) loadScanLog();
+}
+
+/* Fetch and render the raw API scanner log */
+function loadScanLog() {
+  fetch('/api?cmd=scanlog')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var log = d.log || [];
+      var el = document.getElementById('scan-entries');
+      if (log.length === 0) {
+        el.innerHTML = '<div style="color:#555">No scans recorded</div>';
+        return;
+      }
+      var html = '';
+      log.forEach(function(e) {
+        var cls = e.result === 'actual' ? 'scan-alert' : 'scan-clear';
+        html += '<div class="log-entry">';
+        html += '<span class="log-time">' + e.time + '</span>';
+        html += '<span class="scan-source">' + e.source + '</span>';
+        html += '<span class="' + cls + '">' + (e.result || 'clear') + '</span>';
+        if (e.data) {
+          html += '<div class="log-raw"><details><summary>Raw data</summary>';
+          html += '<pre>' + e.data + '</pre>';
+          html += '</details></div>';
+        }
+        html += '</div>';
+      });
+      el.innerHTML = html;
+    })
+    .catch(function() {});
+}
+loadAlertLog();
+loadScanLog();

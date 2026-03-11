@@ -5,6 +5,7 @@ import sys
 import time
 import urllib.request
 
+from lib.alert_log import log_scan
 from lib.config import (
     WATCH_TERMS, TITLE_PREEMPTIVE, TITLE_ACTUAL, TITLE_ENDED,
 )
@@ -49,14 +50,17 @@ def _classify_alert(data):
 
 
 def check_alerts():
-    """Check Pikud HaOref API with history fallback."""
+    """Check Pikud HaOref API with history fallback. Returns (result, raw_data) tuple."""
     try:
         raw = _fetch_url(URL)
         if raw:
             data = json.loads(raw)
             result = _classify_alert(data)
+            log_scan("primary", raw, result)
             if result:
-                return result
+                return result, data
+        else:
+            log_scan("primary", "", None)
 
         raw = _fetch_url(HISTORY_URL)
         if raw:
@@ -76,8 +80,10 @@ def check_alerts():
                             continue
                     result = _classify_alert(entry)
                     if result:
-                        return result
+                        log_scan("history", json.dumps(entry, ensure_ascii=False), result)
+                        return result, entry
     except Exception as e:
+        log_scan("error", str(e), None)
         if "--verbose" in sys.argv:
             print("Error: " + str(e), flush=True)
-    return None
+    return None, None

@@ -471,7 +471,8 @@ class TestCheckAlertsIntegration(unittest.TestCase):
             "title": "ירי רקטות וטילים",
             "data": ["גבעתיים"],
         })
-        self.assertEqual(check_alerts(), "actual")
+        result, raw = check_alerts()
+        self.assertEqual(result, "actual")
         mock_fetch.assert_called_once()
 
     @patch("lib.oref._fetch_url")
@@ -489,7 +490,8 @@ class TestCheckAlertsIntegration(unittest.TestCase):
                 "alertDate": alert_date,
             }]),
         ]
-        self.assertEqual(check_alerts(), "actual")
+        result, raw = check_alerts()
+        self.assertEqual(result, "actual")
         self.assertEqual(mock_fetch.call_count, 2)
 
     @patch("lib.oref._fetch_url")
@@ -503,7 +505,8 @@ class TestCheckAlertsIntegration(unittest.TestCase):
                 "alertDate": "2020-01-01 12:00:00",
             }]),
         ]
-        self.assertIsNone(check_alerts())
+        result, raw = check_alerts()
+        self.assertIsNone(result)
 
     @patch("lib.oref._fetch_url")
     def test_no_match_returns_none(self, mock_fetch):
@@ -511,12 +514,14 @@ class TestCheckAlertsIntegration(unittest.TestCase):
             json.dumps({"title": "ירי רקטות וטילים", "data": ["חיפה"]}),
             json.dumps([]),
         ]
-        self.assertIsNone(check_alerts())
+        result, raw = check_alerts()
+        self.assertIsNone(result)
 
     @patch("lib.oref._fetch_url")
     def test_network_error_returns_none(self, mock_fetch):
         mock_fetch.side_effect = Exception("Connection refused")
-        self.assertIsNone(check_alerts())
+        result, raw = check_alerts()
+        self.assertIsNone(result)
 
 
 class TestStateResume(unittest.TestCase):

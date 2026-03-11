@@ -4,7 +4,7 @@
 <title>Stars Outside - Camera Control Panel</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v=3">
 </head>
 <body>
 <div class="container">
@@ -110,7 +110,17 @@
       </div>
     </div>
   </div>
+  <div class="logs-row">
+    <div class="log-panel">
+      <h3 onclick="toggleLog()">Alert Log <span class="toggle" id="log-toggle">&#9650;</span></h3>
+      <div id="log-entries" class="log-entries"></div>
+    </div>
+    <div class="log-panel">
+      <h3 onclick="toggleScanLog()">Scanner Log <span class="toggle" id="scan-toggle">&#9650;</span></h3>
+      <div id="scan-entries" class="log-entries"></div>
+    </div>
+  </div>
 </div>
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=3"></script>
 </body>
 </html>
