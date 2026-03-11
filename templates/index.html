@@ -35,6 +35,7 @@
         </div>
       </article>
       <p class="status-text" x-show="camOn && pubStatus" x-text="pubStatus"></p>
+      <p class="stream-stats" x-show="camOn && streamStats" x-text="streamStats"></p>
 
       <div class="agg-log-panel">
         <div class="agg-log-header" :style="panels.eventLog ? '' : 'padding-bottom:0;margin-bottom:0'" @click="panels.eventLog = !panels.eventLog">
@@ -181,9 +182,9 @@
           <div class="setting-row">
             <span class="sysinfo-label">Filters</span>
             <div role="group">
-              <button :class="active.grayscale ? '' : 'outline'"
+              <button :class="cssGrayscale ? '' : 'outline'"
                       @click="toggleGrayscale()">Grayscale</button>
-              <button :class="active.invert ? '' : 'outline'"
+              <button :class="cssInvert ? '' : 'outline'"
                       @click="toggleInvert()">Invert</button>
             </div>
           </div>

@@ -3,6 +3,7 @@ function app() {
   return {
     /* Reactive state */
     status: '',
+    streamStats: '',
     defcon: 'DEFCON 5',
     defconTime: '',
     camOn: localStorage.getItem('camOn') === 'true',
@@ -24,7 +25,9 @@ function app() {
     cpuHistory: [],
     tempHistory: [],
     services: {},
-    active: { mode: '', res: '', rotation: '', fps: '', grayscale: localStorage.getItem('filterGrayscale') === 'true', invert: localStorage.getItem('filterInvert') === 'true' },
+    active: { mode: '', res: '', rotation: '', fps: '' },
+    cssGrayscale: localStorage.getItem('filterGrayscale') === 'true',
+    cssInvert: localStorage.getItem('filterInvert') === 'true',
     lastRes: '',
     lastFps: '',
 
@@ -142,7 +145,34 @@ function app() {
         streamEl.src = 'http://' + host + ':8080/?action=stream';
         streamEl.style.display = '';
       }
-      this.applyFilters();
+      /* Stream watchdog: reconnect if stream stalls */
+      if (streamEl) {
+        var lastSize = 0;
+        var staleCount = 0;
+        streamEl.addEventListener('error', function() {
+          if (self.camOn) {
+            self.streamStats = 'Stream error — reconnecting...';
+            setTimeout(function() {
+              streamEl.src = 'http://' + host + ':8080/?action=stream&t=' + Date.now();
+            }, 1000);
+          }
+        });
+        setInterval(function() {
+          if (!self.camOn) return;
+          if (streamEl.naturalWidth === 0 && streamEl.style.display !== 'none') {
+            staleCount++;
+            self.streamStats = 'Stale (' + staleCount + ')';
+            if (staleCount >= 2) {
+              self.streamStats = 'Reconnecting...';
+              streamEl.src = 'http://' + host + ':8080/?action=stream&t=' + Date.now();
+              staleCount = 0;
+            }
+          } else {
+            staleCount = 0;
+            self.streamStats = '';
+          }
+        }, 5000);
+      }
       var noPolling = new URLSearchParams(location.search).get('polling') === 'false';
       this.fetchStatus();
       this.loadSysInfo();
@@ -160,20 +190,20 @@ function app() {
       var el = document.getElementById('stream');
       if (!el) return;
       var f = [];
-      if (this.active.grayscale) f.push('grayscale(1)');
-      if (this.active.invert) f.push('invert(1)');
-      el.style.filter = f.length ? f.join(' ') : '';
+      if (this.cssGrayscale) f.push('grayscale(1)');
+      if (this.cssInvert) f.push('invert(1)');
+      el.style.filter = f.length ? f.join(' ') : 'none';
     },
 
     toggleGrayscale() {
-      this.active.grayscale = !this.active.grayscale;
-      localStorage.setItem('filterGrayscale', this.active.grayscale);
+      this.cssGrayscale = !this.cssGrayscale;
+      localStorage.setItem('filterGrayscale', this.cssGrayscale);
       this.applyFilters();
     },
 
     toggleInvert() {
-      this.active.invert = !this.active.invert;
-      localStorage.setItem('filterInvert', this.active.invert);
+      this.cssInvert = !this.cssInvert;
+      localStorage.setItem('filterInvert', this.cssInvert);
       this.applyFilters();
     },
 

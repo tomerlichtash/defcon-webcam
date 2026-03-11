@@ -1,11 +1,21 @@
 """System information gathering for the web UI."""
 
 import os
-import subprocess
+import time
 
 from lib.state import load_state
 
 DB_PATH = "/tmp/defcon-events.db"
+
+# Map systemd ActiveState values to simple labels
+_ACTIVE_STATES = {
+    "active": "active",
+    "activating": "activating",
+    "deactivating": "deactivating",
+    "reloading": "reloading",
+    "inactive": "inactive",
+    "failed": "failed",
+}
 
 
 def _human_size(size_bytes):
@@ -17,27 +27,63 @@ def _human_size(size_bytes):
     return f"{size_bytes:.1f} TB"
 
 
+def _service_state(name):
+    """Read service ActiveState from /sys/fs/cgroup or systemd runtime dir."""
+    try:
+        path = f"/run/systemd/units/invocation:{name}.service"
+        if os.path.exists(path):
+            # Service has been invoked — read actual state from runtime props
+            prop_path = f"/sys/fs/cgroup/system.slice/{name}.service/cgroup.events"
+            if os.path.exists(prop_path):
+                with open(prop_path) as f:
+                    content = f.read()
+                    if "populated 1" in content:
+                        return "active"
+                    return "inactive"
+        # Fallback: check if the service's PID file or main PID exists
+        pidfile = f"/run/{name}.pid"
+        if os.path.exists(pidfile):
+            return "active"
+        # Last resort: check cgroup for any processes
+        procs = f"/sys/fs/cgroup/system.slice/{name}.service/cgroup.procs"
+        if os.path.exists(procs):
+            with open(procs) as f:
+                return "active" if f.read().strip() else "inactive"
+        return "inactive"
+    except Exception:
+        return "unknown"
+
+
+def _uptime_pretty():
+    """Read uptime from /proc/uptime and format it."""
+    try:
+        with open("/proc/uptime") as f:
+            secs = int(float(f.read().split()[0]))
+        days, rem = divmod(secs, 86400)
+        hours, rem = divmod(rem, 3600)
+        mins, _ = divmod(rem, 60)
+        parts = []
+        if days:
+            parts.append(f"{days} day{'s' if days != 1 else ''}")
+        if hours:
+            parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+        if mins:
+            parts.append(f"{mins} minute{'s' if mins != 1 else ''}")
+        return ", ".join(parts) or "0 minutes"
+    except Exception:
+        return "unknown"
+
+
 def get_sysinfo():
     """Gather service status, uptime, load, temperature, and DEFCON state."""
     info = {}
 
     services = {}
     for svc in ["mjpg-alert", "mjpg-streamer"]:
-        try:
-            r = subprocess.run(["systemctl", "is-active", svc],
-                               capture_output=True, text=True, timeout=5)
-            services[svc] = r.stdout.strip()
-        except Exception:
-            services[svc] = "unknown"
-
-
+        services[svc] = _service_state(svc)
     info["services"] = services
 
-    try:
-        r = subprocess.run(["uptime", "-p"], capture_output=True, text=True, timeout=5)
-        info["uptime"] = r.stdout.strip()
-    except Exception:
-        pass
+    info["uptime"] = _uptime_pretty()
 
     try:
         with open("/proc/loadavg") as f:

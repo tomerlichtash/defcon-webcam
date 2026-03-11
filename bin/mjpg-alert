@@ -106,8 +106,9 @@ def main():
                         tweet_cancelled = True
                         break
                 if not tweet_cancelled and state_mod.state == "defcon2":
-                    post_tweet(tweet_text, mode)
-                    post_telegram(tweet_text, mode)
+                    # post_tweet(tweet_text, mode)  # auto-publish disabled
+                    # post_telegram(tweet_text, mode)  # auto-publish disabled
+                    pass
 
         time.sleep(CHECK_INTERVAL)
 
