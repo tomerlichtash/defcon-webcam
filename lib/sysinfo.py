@@ -1,8 +1,20 @@
 """System information gathering for the web UI."""
 
+import os
 import subprocess
 
 from lib.state import load_state
+
+DB_PATH = "/tmp/defcon-events.db"
+
+
+def _human_size(size_bytes):
+    """Format bytes as human-readable string."""
+    for unit in ("B", "KB", "MB", "GB"):
+        if size_bytes < 1024:
+            return f"{size_bytes:.1f} {unit}" if unit != "B" else f"{size_bytes} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.1f} TB"
 
 
 def get_sysinfo():
@@ -46,6 +58,13 @@ def get_sysinfo():
             info["temp"] = f"{temp_c:.1f}\u00b0"
     except Exception:
         pass
+
+    try:
+        info["db_size"] = _human_size(os.path.getsize(DB_PATH))
+        info["db_ok"] = True
+    except Exception:
+        info["db_size"] = "N/A"
+        info["db_ok"] = False
 
     state = load_state()
     if state == "defcon2":

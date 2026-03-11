@@ -8,6 +8,15 @@ LOG_FILE = "/tmp/mjpg-alert-log.json"
 MAX_ENTRIES = 100
 
 
+def _unified_log(event_type, **kwargs):
+    """Write to unified event log (best-effort)."""
+    try:
+        from lib.event_log import log_event as _log
+        _log(event_type, **kwargs)
+    except Exception:
+        pass
+
+
 def log_event(defcon, raw_data=None):
     """Append a DEFCON state change to the log file."""
     entry = {
@@ -26,6 +35,9 @@ def log_event(defcon, raw_data=None):
             json.dump(entries, f, ensure_ascii=False)
     except Exception:
         pass
+
+    # Also write to unified event log
+    _unified_log("alert", defcon=defcon, raw=raw_data)
 
 
 def load_log():
@@ -59,6 +71,10 @@ def log_scan(source, raw_text, result):
             json.dump(entries, f, ensure_ascii=False)
     except Exception:
         pass
+
+    # Also write to unified event log
+    _unified_log("scan", source=source, result=result,
+                 data=raw_text[:500] if raw_text else "")
 
 
 def load_scan_log():

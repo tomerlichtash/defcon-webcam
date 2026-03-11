@@ -41,17 +41,17 @@ def main():
     state_mod.state = load_state()
     if state_mod.state == "defcon2":
         ts = time.strftime("%H:%M:%S")
-        set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
+        set_display(alert="INCOMING MISSILES - " + ts)
         apply_camera_profile("alert")
         print("Resuming in DEFCON 2 (persisted state)", flush=True)
     elif state_mod.state == "defcon4":
         ts = time.strftime("%H:%M:%S")
-        set_display(defcon4="DEFCON 4 - ALERT INCOMING - " + ts)
+        set_display(defcon4="INCOMING ALERT - " + ts)
         apply_camera_profile("alert")
         print("Resuming in DEFCON 4 (persisted state)", flush=True)
     else:
         state_mod.state = "idle"
-        set_display(idle="DEFCON 5 -- CLEAR SKIES")
+        set_display(idle="CLEAR SKIES")
         apply_camera_profile("rest")
         print("Starting in DEFCON 5", flush=True)
 
@@ -65,7 +65,7 @@ def main():
                 log_event("DEFCON 5", raw_data)
                 state_mod.state = "idle"
                 save_state("idle")
-                set_display(idle="DEFCON 5 -- CLEAR SKIES")
+                set_display(idle="CLEAR SKIES")
                 apply_camera_profile("rest")
 
         elif result == "preemptive":
@@ -75,7 +75,7 @@ def main():
                 log_event("DEFCON 4", raw_data)
                 state_mod.state = "defcon4"
                 save_state("defcon4")
-                set_display(defcon4="DEFCON 4 - ALERT INCOMING - " + ts)
+                set_display(defcon4="INCOMING ALERT - " + ts)
                 apply_camera_profile("alert")
 
         elif result == "actual":
@@ -87,7 +87,7 @@ def main():
                 log_event("DEFCON 2", raw_data)
                 state_mod.state = "defcon2"
                 save_state("defcon2")
-                set_display(alert="DEFCON 2 - INCOMING MISSILES - " + ts)
+                set_display(alert="INCOMING MISSILES - " + ts)
                 if prev == "idle":
                     apply_camera_profile("alert")
                 tweet_text = "DEFCON 2 - INCOMING MISSILES\n" + ts_tweet
@@ -101,7 +101,7 @@ def main():
                         log_event("DEFCON 5", None)
                         state_mod.state = "idle"
                         save_state("idle")
-                        set_display(idle="DEFCON 5 -- CLEAR SKIES")
+                        set_display(idle="CLEAR SKIES")
                         apply_camera_profile("rest")
                         tweet_cancelled = True
                         break
