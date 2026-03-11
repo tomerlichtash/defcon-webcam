@@ -33,7 +33,9 @@ def _fetch_url(url):
 
 def _classify_alert(data):
     """Classify alert data. Returns 'preemptive', 'actual', 'ended', or None."""
-    cities = data.get("data", [])
+    raw = data.get("data", [])
+    # History API returns data as a string (single city), primary API as a list
+    cities = raw if isinstance(raw, list) else [raw] if raw else []
     title = data.get("title", "")
     matched = [c for c in cities if any(t in c for t in WATCH_TERMS)]
     if matched:

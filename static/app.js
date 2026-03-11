@@ -24,7 +24,7 @@ function app() {
     cpuHistory: [],
     tempHistory: [],
     services: {},
-    active: { mode: '', res: '', rotation: '', fps: '' },
+    active: { mode: '', res: '', rotation: '', fps: '', grayscale: false, invert: false },
     lastRes: '',
     lastFps: '',
 
@@ -152,6 +152,26 @@ function app() {
           this.loadEventLog();
         }, 5000);
       }
+    },
+
+    /* Apply CSS filters to stream image */
+    applyFilters() {
+      var el = document.getElementById('stream');
+      if (!el) return;
+      var f = [];
+      if (this.active.grayscale) f.push('grayscale(1)');
+      if (this.active.invert) f.push('invert(1)');
+      el.style.filter = f.length ? f.join(' ') : '';
+    },
+
+    toggleGrayscale() {
+      this.active.grayscale = !this.active.grayscale;
+      this.applyFilters();
+    },
+
+    toggleInvert() {
+      this.active.invert = !this.active.invert;
+      this.applyFilters();
     },
 
     /* Parse camera status output and sync active button states */

@@ -178,6 +178,15 @@
             <input type="range" min="100" max="500" step="10" x-model="zoom"
                    @change="cmd('zoom ' + zoom)">
           </div>
+          <div class="setting-row">
+            <span class="sysinfo-label">Filters</span>
+            <div role="group">
+              <button :class="active.grayscale ? '' : 'outline'"
+                      @click="toggleGrayscale()">Grayscale</button>
+              <button :class="active.invert ? '' : 'outline'"
+                      @click="toggleInvert()">Invert</button>
+            </div>
+          </div>
         </div>
       </article>
 
