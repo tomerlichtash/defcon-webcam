@@ -107,7 +107,12 @@ var MapModule = {
       this.userCircle.setLatLng([lat, lng]);
       this.userMarker.setLatLng([lat, lng]);
     } else {
-      const defconColor = this.defconColor;
+      const defconColor =
+        this.defcon === 2
+          ? "#ff0000"
+          : this.defcon === 4
+            ? "#00cc00"
+            : "#4488ff";
       this.userCircle = L.circle([lat, lng], {
         radius: 2500,
         color: defconColor,

@@ -117,10 +117,32 @@ nav > ul:last-child {
 .defcon-label {
   display: inline-block;
   font-weight: 300;
+  color: #4488ff !important;
+}
+
+.defcon-label.defcon4 {
+  color: #00cc00 !important;
 }
 
 .defcon-label.siren {
-  animation: siren 1.5s ease-in-out infinite;
+  color: var(--color-red) !important;
+  animation: siren-glow 1.5s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 5px var(--color-red));
+}
+
+/* ---- Level indicators (CPU / temp) ---- */
+
+.level-ok {
+  color: var(--color-ok);
+}
+.level-warn {
+  color: var(--color-warn);
+}
+.level-danger {
+  color: var(--color-danger);
+}
+.level-critical {
+  color: var(--color-red);
 }
 
 /* ---- Main layout ---- */
@@ -163,6 +185,9 @@ nav > ul:last-child {
 
 #leaflet-map .leaflet-control-recenter {
   margin: 0;
+  margin-inline-start: 10px !important;
+  margin-inline-end: 10px !important;
+  box-shadow: none !important;
   border-bottom: none;
   box-shadow: 0 1px 5px var(--shadow-drop);
 }
@@ -258,7 +283,7 @@ nav > ul:last-child {
 
 .positive-msg-el {
   position: fixed;
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 9999;
   font-size: 1.4em;
   font-weight: bold;

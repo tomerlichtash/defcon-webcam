@@ -20,7 +20,7 @@
       <ul>
         <li><strong class="site-title"><span x-text="siteName"></span></strong>
           &nbsp;|&nbsp;
-          <span class="defcon-label" :class="{'siren': defcon === 2}" :style="{color: defconColor}" x-text="defconLabel">CLEAR SKIES</span>
+          <span class="defcon-label" :class="{'siren': defcon === 2, 'defcon4': defcon === 4}" x-text="defconLabel">CLEAR SKIES</span>
           <span class="status-bar" x-show="status" x-text="status"></span>
         </li>
       </ul>

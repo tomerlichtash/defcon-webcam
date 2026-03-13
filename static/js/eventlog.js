@@ -34,6 +34,25 @@ var EventLogModule = {
     );
   },
 
+  loadEventLog() {
+    let url = "/api?cmd=eventlog";
+    if (this.eventLog.length > 0)
+      url += "&since=" + encodeURIComponent(this.eventLog[0].time);
+    fetch(url)
+      .then((r) => r.json())
+      .then((d) => {
+        const newEvents = d.log || [];
+        this.eventTotal = d.total || 0;
+        this._applyDefcon(d.defcon);
+        if (this.eventLog.length === 0) this.eventLog = newEvents;
+        else if (newEvents.length > 0)
+          this.eventLog = newEvents.concat(this.eventLog);
+      })
+      .catch((e) => {
+        console.warn("loadEventLog failed:", e);
+      });
+  },
+
   loadMore() {
     this.loadingMore = true;
     fetch(`/api?cmd=eventlog&offset=${this.eventLog.length}`)

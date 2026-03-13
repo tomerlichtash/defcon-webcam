@@ -16,8 +16,8 @@ var SysinfoModule = {
     _sparkId: 0,
   },
 
-  /* Sparkline SVG generator */
-  sparkline(data, color, max) {
+  /* Sparkline SVG generator — uses currentColor (inherited from CSS) */
+  sparkline(data, max) {
     if (data.length < 2) return "";
     const w = 80,
       h = 24,
@@ -37,32 +37,32 @@ var SysinfoModule = {
     const last = pts[pts.length - 1];
     return (
       `<svg width="${w}" height="${h}" style="margin-right:6px">` +
-      `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.3"/><stop offset="100%" stop-color="${color}" stop-opacity="0.02"/></linearGradient></defs>` +
+      `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity="0.3"/><stop offset="100%" stop-color="currentColor" stop-opacity="0.02"/></linearGradient></defs>` +
       `<path d="${areaD}" fill="url(#${id})"/>` +
-      `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` +
-      `<circle cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="2" fill="${color}"/>` +
+      `<path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<circle cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="2" fill="currentColor"/>` +
       "</svg>"
     );
   },
   get cpuSpark() {
-    return this.sparkline(this.cpuHistory, this.cpuColor, 100);
+    return this.sparkline(this.cpuHistory, 100);
   },
   get tempSpark() {
-    return this.sparkline(this.tempHistory, this.tempColor, 100);
+    return this.sparkline(this.tempHistory, 100);
   },
-  get cpuColor() {
+  get cpuLevel() {
     const pct = parseInt(this.sys.load);
-    return pct < 60 ? "#4ecca3" : pct < 80 ? "#f0a500" : "#e94560";
+    return pct < 60 ? "ok" : pct < 80 ? "warn" : "danger";
   },
-  get tempColor() {
+  get tempLevel() {
     const deg = parseFloat(this.sys.temp);
     return deg < 60
-      ? "#4ecca3"
+      ? "ok"
       : deg < 70
-        ? "#f0a500"
+        ? "warn"
         : deg < 80
-          ? "#e94560"
-          : "#ff0000";
+          ? "danger"
+          : "critical";
   },
   get allServicesUp() {
     const svcs = this.services;
@@ -109,6 +109,36 @@ var SysinfoModule = {
         );
       })
       .join("");
+  },
+
+  loadSysInfo() {
+    fetch("/api?cmd=sysinfo")
+      .then((r) => r.json())
+      .then((d) => {
+        const info = d.sysinfo || {};
+        if (info.uptime) this.sys.uptime = info.uptime.replace(/^up\s+/, "");
+        if (info.load) {
+          this.sys.load = info.load;
+          this.cpuHistory.push(parseInt(info.load));
+          if (this.cpuHistory.length > 30) this.cpuHistory.shift();
+        }
+        if (info.temp) {
+          this.sys.temp = info.temp;
+          this.tempHistory.push(parseFloat(info.temp));
+          if (this.tempHistory.length > 30) this.tempHistory.shift();
+        }
+        if (info.db_size) this.sys.dbSize = info.db_size;
+        this.sys.dbOk = info.db_ok !== false;
+        if (info.geo_count !== undefined) this.sys.geoCount = info.geo_count;
+        this.sys.geoOk = info.geo_ok !== false;
+        if (info.has_camera !== undefined) this.hasCamera = info.has_camera;
+        if (info.services) this.services = info.services;
+        this._applyDefcon(info.defcon);
+        this._applyAlertCities(info.defcon, info.alert_cities);
+      })
+      .catch((e) => {
+        console.warn("loadSysInfo failed:", e);
+      });
   },
 
   svcRestart(name) {

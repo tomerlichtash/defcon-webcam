@@ -21,7 +21,7 @@
       <ul>
         <li><strong class="site-title"><span x-text="siteName"></span></strong>
           &nbsp;|&nbsp;
-          <span class="defcon-label" :class="{'siren': defcon === 2}" :style="{color: defconColor}" x-text="defconLabel">CLEAR SKIES</span>
+          <span class="defcon-label" :class="{'siren': defcon === 2, 'defcon4': defcon === 4}" x-text="defconLabel">CLEAR SKIES</span>
           <span class="status-bar" x-show="status" x-text="status"></span>
         </li>
       </ul>
@@ -59,13 +59,13 @@
           <div class="sysinfo-section">
             <div class="sysinfo-row">
               <span class="sysinfo-label" x-text="t('cpu')"></span>
-              <span class="spark-value"><span x-html="cpuSpark"></span><span :style="{color: cpuColor}" x-text="sys.load"></span></span>
+              <span class="spark-value" :class="'level-' + cpuLevel"><span x-html="cpuSpark"></span><span x-text="sys.load"></span></span>
             </div>
           </div>
           <div class="sysinfo-section" x-show="sys.temp && sys.temp !== '...'">
             <div class="sysinfo-row">
               <span class="sysinfo-label" x-text="t('temp')"></span>
-              <span class="spark-value"><span x-html="tempSpark"></span><span :style="{color: tempColor}" x-text="sys.temp"></span></span>
+              <span class="spark-value" :class="'level-' + tempLevel"><span x-html="tempSpark"></span><span x-text="sys.temp"></span></span>
             </div>
           </div>
           <div class="svc-row" style="margin-top:6px">

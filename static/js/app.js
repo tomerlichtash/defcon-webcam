@@ -56,13 +56,6 @@ function app() {
     hasCamera: false,
 
     /* Computed — core */
-    get defconColor() {
-      return this.defcon === 2
-        ? "#ff0000"
-        : this.defcon === 4
-          ? "#00cc00"
-          : "#4488ff";
-    },
     get siteName() {
       return this._strings.site_name || "Stars Outside";
     },
@@ -280,53 +273,6 @@ function app() {
         })
         .catch((e) => {
           console.warn("loadDefcon failed:", e);
-        });
-    },
-    loadSysInfo() {
-      fetch("/api?cmd=sysinfo")
-        .then((r) => r.json())
-        .then((d) => {
-          const info = d.sysinfo || {};
-          if (info.uptime) this.sys.uptime = info.uptime.replace(/^up\s+/, "");
-          if (info.load) {
-            this.sys.load = info.load;
-            this.cpuHistory.push(parseInt(info.load));
-            if (this.cpuHistory.length > 30) this.cpuHistory.shift();
-          }
-          if (info.temp) {
-            this.sys.temp = info.temp;
-            this.tempHistory.push(parseFloat(info.temp));
-            if (this.tempHistory.length > 30) this.tempHistory.shift();
-          }
-          if (info.db_size) this.sys.dbSize = info.db_size;
-          this.sys.dbOk = info.db_ok !== false;
-          if (info.geo_count !== undefined) this.sys.geoCount = info.geo_count;
-          this.sys.geoOk = info.geo_ok !== false;
-          if (info.has_camera !== undefined) this.hasCamera = info.has_camera;
-          if (info.services) this.services = info.services;
-          this._applyDefcon(info.defcon);
-          this._applyAlertCities(info.defcon, info.alert_cities);
-        })
-        .catch((e) => {
-          console.warn("loadSysInfo failed:", e);
-        });
-    },
-    loadEventLog() {
-      let url = "/api?cmd=eventlog";
-      if (this.eventLog.length > 0)
-        url += "&since=" + encodeURIComponent(this.eventLog[0].time);
-      fetch(url)
-        .then((r) => r.json())
-        .then((d) => {
-          const newEvents = d.log || [];
-          this.eventTotal = d.total || 0;
-          this._applyDefcon(d.defcon);
-          if (this.eventLog.length === 0) this.eventLog = newEvents;
-          else if (newEvents.length > 0)
-            this.eventLog = newEvents.concat(this.eventLog);
-        })
-        .catch((e) => {
-          console.warn("loadEventLog failed:", e);
         });
     },
   };

@@ -1,19 +1,24 @@
 /* Stars Outside — shared keyframe animations */
 
-@keyframes siren {
-  0%,
-  100% {
-    text-shadow:
-      0 0 5px var(--color-red),
-      0 0 10px var(--color-red);
-    color: var(--color-red);
+/* Override Pico's prefers-reduced-motion blanket kill — our alert
+   animations are functional (safety-critical), not decorative. */
+@media (prefers-reduced-motion: reduce) {
+  .siren,
+  .alert-marker.defcon2 {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
   }
-  50% {
-    text-shadow:
-      0 0 20px var(--color-red),
-      0 0 40px var(--color-red),
-      0 0 80px var(--color-red);
-    color: var(--color-red-light);
+}
+
+@keyframes siren-glow {
+  from {
+    filter: drop-shadow(0 0 5px var(--color-red));
+    opacity: 1;
+  }
+  to {
+    filter: drop-shadow(0 0 20px var(--color-red))
+      drop-shadow(0 0 40px var(--color-red));
+    opacity: 0.85;
   }
 }
 
