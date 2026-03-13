@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html data-theme="dark">
+<head>
+<title>Stars Outside</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Secular+One&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/static/vendor/pico.min.css">
+<link rel="stylesheet" href="/static/styles/keyframes.css">
+<link rel="stylesheet" href="/static/styles/style.css">
+<script defer src="/static/vendor/alpine.min.js"></script>
+</head>
+<body x-data="app()" x-init="init()" data-page="public">
+<main class="container-fluid">
+  <div class="top-bar">
+    <nav>
+      <ul>
+        <li><strong class="site-title"><span x-text="siteName"></span></strong>
+          &nbsp;|&nbsp;
+          <span class="defcon-label" :class="{'siren': defcon === 2}" :style="{color: defconColor}" x-text="defconLabel">CLEAR SKIES</span>
+          <span class="status-bar" x-show="status" x-text="status"></span>
+        </li>
+      </ul>
+      <ul>
+        <li><span class="locale-toggle" role="button" @click="toggleLocale()" x-text="locale === 'he' ? 'EN' : 'עב'"></span></li>
+        <li><span class="theme-toggle" role="button" @click="toggleTheme()" x-text="darkMode ? '☀️' : '🌙'"></span></li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="main-layout">
+    <div class="stream-col">
+      <div class="map-container">
+        <div id="leaflet-map"></div>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/confetti-js@0.0.18/dist/index.min.js"></script>
+<script src="/static/js/map.js"></script>
+<script src="/static/js/effects.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

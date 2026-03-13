@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html data-theme="dark">
+<head>
+<title>Stars Outside - Admin</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Secular+One&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/static/vendor/pico.min.css">
+<link rel="stylesheet" href="/static/styles/keyframes.css">
+<link rel="stylesheet" href="/static/styles/style.css">
+<link rel="stylesheet" href="/static/styles/admin.css">
+<script defer src="/static/vendor/alpine.min.js"></script>
+</head>
+<body x-data="app()" x-init="init()" data-page="admin">
+<main class="container-fluid">
+  <div class="top-bar">
+    <nav>
+      <ul>
+        <li><strong class="site-title"><span x-text="siteName"></span></strong>
+          &nbsp;|&nbsp;
+          <span class="defcon-label" :class="{'siren': defcon === 2}" :style="{color: defconColor}" x-text="defconLabel">CLEAR SKIES</span>
+          <span class="status-bar" x-show="status" x-text="status"></span>
+        </li>
+      </ul>
+      <ul>
+        <li>
+          <span x-show="defcon !== 2" class="theme-toggle" role="button" @click="simulate(simCount)" x-text="t('simulate')"></span>
+          <span x-show="defcon === 2" class="theme-toggle btn-danger" role="button" @click="clearAlertCities(); defcon = 5; _simulating = false; stopPositiveMessages(); updateMapMarkers(); fireConfetti()">Clear</span>
+        </li>
+        <li><span class="locale-toggle" role="button" @click="toggleLocale()" x-text="locale === 'he' ? 'EN' : 'עב'"></span></li>
+        <li><span class="theme-toggle" role="button" @click="toggleTheme()" x-text="darkMode ? '☀️' : '🌙'"></span></li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="main-layout">
+    <div class="stream-col">
+      <div class="map-container">
+        <div id="leaflet-map"></div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <!-- System Info -->
+      <article>
+        <header @click="togglePanel('sysinfo')">
+          <span x-text="t('system')"></span> <span x-text="chevron(panels.sysinfo)"></span>
+        </header>
+        <div x-show="panels.sysinfo" class="control-group" style="padding-bottom:10px">
+          <div class="sysinfo-section">
+            <div class="sysinfo-row">
+              <span class="sysinfo-label" x-text="t('uptime')"></span>
+              <span x-text="sys.uptime"></span>
+            </div>
+          </div>
+          <div class="sysinfo-section">
+            <div class="sysinfo-row">
+              <span class="sysinfo-label" x-text="t('cpu')"></span>
+              <span class="spark-value"><span x-html="cpuSpark"></span><span :style="{color: cpuColor}" x-text="sys.load"></span></span>
+            </div>
+          </div>
+          <div class="sysinfo-section" x-show="sys.temp && sys.temp !== '...'">
+            <div class="sysinfo-row">
+              <span class="sysinfo-label" x-text="t('temp')"></span>
+              <span class="spark-value"><span x-html="tempSpark"></span><span :style="{color: tempColor}" x-text="sys.temp"></span></span>
+            </div>
+          </div>
+          <div class="svc-row" style="margin-top:6px">
+            <span class="svc-dot" :class="webRestarting ? 'down' : noPolling ? 'warn' : 'up'"></span>
+            <span class="sysinfo-label" x-text="t('web')"></span>
+            <button class="outline btn-danger svc-restart-btn" @click="restartServer()" x-text="t('restart')"></button>
+          </div>
+          <div class="svc-row">
+            <span class="svc-dot" :class="sys.dbOk ? 'up' : 'down'"></span>
+            <span class="sysinfo-label"><span x-text="t('log')"></span> <small x-text="'(' + sys.dbSize + ')'" style="opacity:0.6"></small></span>
+            <button class="outline btn-danger svc-restart-btn" @click="dbReset()" x-text="t('reset')"></button>
+          </div>
+          <div class="svc-row">
+            <span class="svc-dot" :class="sys.geoOk ? 'up' : 'down'"></span>
+            <span class="sysinfo-label"><span x-text="t('geo')"></span> <small x-text="'(' + sys.geoCount + ')'" style="opacity:0.6"></small></span>
+          </div>
+          <div x-html="servicesRows"></div>
+        </div>
+      </article>
+
+      <!-- Camera Controls -->
+      <article>
+        <header @click="togglePanel('image')">
+          <span><span x-text="t('camera')"></span> <button class="outline cam-header-toggle" :class="!hasCamera ? 'offline' : camOn ? 'on' : 'off'"
+                  @click.stop="hasCamera && camCtl(camOn ? 'stop' : 'start')" :disabled="camLoading || !hasCamera"
+                  x-text="!hasCamera ? t('offline') : camLoading ? '...' : (camOn ? t('on') : t('off'))"></button></span>
+          <span x-text="chevron(panels.image)"></span>
+        </header>
+        <div x-show="panels.image" :class="{'controls-disabled': !camOn}" class="settings-panel">
+          <div class="setting-row">
+            <span class="sysinfo-label" x-text="t('mode')"></span>
+            <div role="group">
+              <template x-for="m in ['day','night']">
+                <button :class="active.mode === m ? '' : 'outline'"
+                        @click="cmd(m)" x-text="m[0].toUpperCase() + m.slice(1)"></button>
+              </template>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label" x-text="t('resolution')"></span>
+            <div role="group">
+              <template x-for="r in [{val:'low',label:'480p'},{val:'mid',label:'720p'},{val:'high',label:'1080p'}]">
+                <button :class="active.res === r.val ? '' : 'outline'"
+                        @click="cmd('res ' + r.val)" x-text="r.label"></button>
+              </template>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label" x-text="t('fps')"></span>
+            <div role="group">
+              <template x-for="f in ['5','10','15','24','30']">
+                <button :class="active.fps === f ? '' : 'outline'"
+                        @click="cmd('fps ' + f)" x-text="f"></button>
+              </template>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label"><span x-text="t('brightness')"></span> <small x-text="bright"></small></span>
+            <input type="range" min="0" max="100" x-model="bright"
+                   @change="cmd('bright ' + bright)">
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label" x-text="t('rotation')"></span>
+            <div role="group">
+              <template x-for="r in ['0','90','180','270']">
+                <button :class="active.rotation === r ? '' : 'outline'"
+                        @click="cmd('rotate ' + r)" x-html="r + '&deg;'"></button>
+              </template>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label"><span x-text="t('zoom')"></span> <small x-text="zoom"></small></span>
+            <input type="range" min="100" max="500" step="10" x-model="zoom"
+                   @change="cmd('zoom ' + zoom)">
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label" x-text="t('filters')"></span>
+            <div role="group">
+              <button :class="cssGrayscale ? '' : 'outline'"
+                      @click="toggleGrayscale()" x-text="t('grayscale')"></button>
+              <button :class="cssInvert ? '' : 'outline'"
+                      @click="toggleInvert()" x-text="t('invert')"></button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Channels -->
+      <article>
+        <header @click="togglePanel('publish')">
+          <span x-text="t('channels')"></span> <span x-text="chevron(panels.publish)"></span>
+        </header>
+        <div x-show="panels.publish" class="settings-panel">
+          <div class="setting-row">
+            <span class="sysinfo-label" x-text="t('telegram')"></span>
+            <input type="checkbox" x-model="pubTelegram">
+          </div>
+          <div class="setting-row">
+            <span class="sysinfo-label" x-text="t('twitter')"></span>
+            <input type="checkbox" x-model="pubTwitter">
+          </div>
+        </div>
+      </article>
+
+      <!-- Event Log -->
+      <article>
+        <header @click="togglePanel('eventLog')">
+          <span x-text="t('event_log')"></span> <span x-text="chevron(panels.eventLog)"></span>
+        </header>
+        <div x-show="panels.eventLog" class="sidebar-log">
+          <div class="sidebar-log-filters">
+            <button class="agg-filter" :class="filters.alerts ? 'active' : ''" @click="filters.alerts = !filters.alerts" x-text="t('alerts')"></button>
+            <button class="agg-filter" :class="filters.scans ? 'active' : ''" @click="filters.scans = !filters.scans" x-text="t('scans')"></button>
+            <button class="agg-filter" :class="filters.status ? 'active' : ''" @click="filters.status = !filters.status" x-text="t('status')"></button>
+            <button class="agg-filter" :class="filters.system ? 'active' : ''" @click="filters.system = !filters.system" x-text="t('system')"></button>
+          </div>
+          <div x-show="panels.eventLog" class="log-entries">
+            <template x-if="aggLog.length === 0">
+              <p><small>No events recorded</small></p>
+            </template>
+            <template x-for="(e, idx) in aggLog" :key="idx">
+              <div class="log-entry sidebar-log-entry" :class="'type-' + e._type" @click="e._open = !e._open">
+                <span class="log-type" x-text="e._type"></span>
+                <span x-text="e.time || ''" class="log-time"></span>
+                <span class="log-content">
+                  <template x-if="e._type === 'alert'">
+                    <span class="log-badge" :class="String(e.defcon).includes('2')?'d2':String(e.defcon).includes('4')?'d4':'d5'"
+                          x-text="typeof e.defcon === 'number' ? 'DEFCON ' + e.defcon : e.defcon"></span>
+                  </template>
+                  <template x-if="e._type === 'scan'">
+                    <span x-text="(e.source || 'scan') + ' (' + (e.result || 'clear') + ')'"></span>
+                  </template>
+                  <template x-if="e._type === 'status'">
+                    <span x-text="e.message"></span>
+                  </template>
+                  <template x-if="e._type === 'system'">
+                    <span><span class="log-label" x-text="e.label"></span> <span x-text="e.value"></span></span>
+                  </template>
+                  <span x-show="e.source && e._type !== 'scan'" x-text="e.source" class="log-source"></span>
+                </span>
+                <pre x-show="e._open && (e.raw || e.data)" x-text="e.raw ? JSON.stringify(e.raw, null, 2) : e.data"></pre>
+              </div>
+            </template>
+            <template x-if="eventLog.length < eventTotal">
+              <div class="load-more">
+                <button class="outline load-more-btn" @click="loadMore()" :disabled="loadingMore"
+                        x-text="loadingMore ? 'Loading...' : 'Load More'"></button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </article>
+
+      <!-- Admin -->
+      <article>
+        <header @click="togglePanel('admin')">
+          <span><span x-text="t('admin')"></span> <button x-show="adminAuth" class="outline admin-logout-btn" @click.stop="adminLogout()" x-text="t('logout')"></button></span>
+          <span x-text="chevron(panels.admin)"></span>
+        </header>
+        <div x-show="panels.admin" class="settings-panel">
+          <template x-if="adminAuth">
+            <div>
+              <div class="admin-section-label" x-text="t('simulate')"></div>
+              <div class="setting-row">
+                <span class="sysinfo-label" x-text="t('cities')"></span>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <input type="number" x-model.number="simCount" min="1" max="1166" class="admin-num-input">
+                  <button class="outline admin-action-btn" @click="simulate(simCount)">Go</button>
+                  <button class="outline admin-action-btn btn-danger" x-show="alertCityMarkers.length > 0" @click="clearAlertCities(); defcon = 5; _simulating = false; stopPositiveMessages(); updateMapMarkers(); fireConfetti()">Clear</button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </article>
+    </div>
+  </div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/confetti-js@0.0.18/dist/index.min.js"></script>
+<script src="/static/js/map.js"></script>
+<script src="/static/js/effects.js"></script>
+<script src="/static/js/sysinfo.js"></script>
+<script src="/static/js/camera.js"></script>
+<script src="/static/js/channels.js"></script>
+<script src="/static/js/eventlog.js"></script>
+<script src="/static/js/admin.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+/* Stars Outside — shared keyframe animations */
+
+@keyframes siren {
+  0%,
+  100% {
+    text-shadow:
+      0 0 5px var(--color-red),
+      0 0 10px var(--color-red);
+    color: var(--color-red);
+  }
+  50% {
+    text-shadow:
+      0 0 20px var(--color-red),
+      0 0 40px var(--color-red),
+      0 0 80px var(--color-red);
+    color: var(--color-red-light);
+  }
+}
+
+@keyframes marker-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 10px var(--color-red),
+      0 0 20px var(--color-red-glow);
+  }
+  50% {
+    box-shadow:
+      0 0 20px var(--color-red),
+      0 0 40px var(--color-red-glow-strong);
+  }
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-60px);
+  }
+}

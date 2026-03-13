@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+"""Populate the geocode database from Overpass API."""
+
+import os
+import sys
+
+_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, _root)
+
+from lib.geocode import init_geo_db, populate_from_overpass, city_count
+
+init_geo_db()
+
+existing = city_count()
+if existing > 0:
+    print(f"Geocode DB already has {existing} cities.")
+    if "--force" not in sys.argv:
+        print("Use --force to re-fetch.")
+        sys.exit(0)
+
+count = populate_from_overpass()
+print(f"Done. {count} cities in geocode DB.")

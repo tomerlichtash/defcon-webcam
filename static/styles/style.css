@@ -1,0 +1,273 @@
+/* Stars Outside — shared styles (loaded after pico.min.css) */
+
+:root {
+  --pico-font-family: "Exo 2", "Secular One", -apple-system, sans-serif;
+
+  /* Semantic colors */
+  --color-ok: #4ecca3;
+  --color-danger: #e94560;
+  --color-warn: #f0a500;
+  --color-red: #ff0000;
+  --color-red-light: #ff4444;
+  --color-green: #00cc00;
+  --color-green-light: #00ee00;
+
+  /* Glow / shadow variants */
+  --color-red-glow: rgba(255, 0, 0, 0.5);
+  --color-red-glow-strong: rgba(255, 0, 0, 0.7);
+  --shadow-drop: rgba(0, 0, 0, 0.4);
+  --shadow-text: rgba(0, 0, 0, 0.6);
+  --shadow-text-light: rgba(0, 0, 0, 0.4);
+
+  /* Surfaces */
+  --overlay-bg: rgba(0, 0, 0, 0.8);
+  --overlay-bg-mid: rgba(0, 0, 0, 0.7);
+  --overlay-bg-light: rgba(0, 0, 0, 0.5);
+  --overlay-border: rgba(255, 255, 255, 0.2);
+  --overlay-border-light: rgba(255, 255, 255, 0.3);
+  --overlay-white: rgba(255, 255, 255, 0.4);
+  --overlay-white-subtle: rgba(255, 255, 255, 0.06);
+  --separator: 1px solid rgba(255, 255, 255, 0.08);
+  --topbar-border-dark: rgba(255, 255, 255, 0.1);
+  --topbar-bg-light: rgba(255, 255, 255, 0.5);
+  --topbar-border-light: rgba(0, 0, 0, 0.1);
+
+  /* Leaflet controls (always light) */
+  --leaflet-control-color: #333;
+  --leaflet-control-bg: #fff;
+  --leaflet-control-bg-hover: #f4f4f4;
+  --leaflet-control-border: #ccc;
+}
+
+/* ---- Reset Pico defaults ---- */
+
+.container-fluid {
+  padding: 0;
+  max-width: 100%;
+  margin: 0;
+}
+
+nav {
+  margin-top: 0;
+  padding: 2px 12px 0;
+  border-bottom: none;
+  overflow: visible;
+}
+
+nav > ul:last-child {
+  margin: 0;
+}
+
+/* ---- Top bar ---- */
+
+.top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1100;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .top-bar {
+  background: var(--overlay-bg-light);
+  border-bottom: 1px solid var(--topbar-border-dark);
+}
+
+[data-theme="light"] .top-bar {
+  background: var(--topbar-bg-light);
+  border-bottom: 1px solid var(--topbar-border-light);
+}
+
+.site-title {
+  text-transform: uppercase;
+}
+
+.status-bar {
+  font-size: 0.6em;
+  font-weight: normal;
+  color: var(--pico-muted-color);
+  margin-left: 10px;
+}
+
+.theme-toggle,
+.locale-toggle {
+  cursor: pointer;
+  font-size: 0.75em;
+  padding: 2px 8px;
+  line-height: 1.4;
+  color: var(--pico-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  background: none;
+  font-weight: bold;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.theme-toggle:hover,
+.locale-toggle:hover {
+  border-color: var(--pico-color);
+}
+
+/* ---- DEFCON status ---- */
+
+.defcon-label {
+  display: inline-block;
+  font-weight: 300;
+}
+
+.defcon-label.siren {
+  animation: siren 1.5s ease-in-out infinite;
+}
+
+/* ---- Main layout ---- */
+
+.main-layout {
+  position: relative;
+}
+
+.stream-col {
+  width: 100%;
+}
+
+/* ---- Map ---- */
+
+.map-container {
+  overflow: hidden;
+}
+
+#leaflet-map {
+  width: 100%;
+  height: 100vh;
+}
+
+/* Leaflet overrides — #leaflet-map ID specificity beats library class selectors */
+
+#leaflet-map {
+  font-size: 14px;
+}
+
+#leaflet-map .leaflet-top {
+  margin-top: var(--top-bar-height, 40px);
+}
+
+#leaflet-map .leaflet-control-zoom {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin-bottom: 0;
+}
+
+#leaflet-map .leaflet-control-recenter {
+  margin: 0;
+  border-bottom: none;
+  box-shadow: 0 1px 5px var(--shadow-drop);
+}
+
+#leaflet-map .leaflet-control-zoom a,
+#leaflet-map .leaflet-control-recenter {
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  font-size: 18px;
+  text-indent: 0;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--leaflet-control-color);
+  background: var(--leaflet-control-bg);
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--leaflet-control-border);
+  cursor: pointer;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+#leaflet-map .leaflet-control-zoom a:hover,
+#leaflet-map .leaflet-control-recenter:hover {
+  background: var(--leaflet-control-bg-hover);
+}
+
+#leaflet-map .leaflet-control-recenter svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Map markers and tooltips */
+
+.alert-marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--overlay-white);
+  border: 2px solid var(--overlay-border-light);
+  transition: all 0.3s;
+}
+
+.alert-marker.defcon2 {
+  background: var(--color-red);
+  border-color: var(--color-red-light);
+  box-shadow:
+    0 0 10px var(--color-red),
+    0 0 20px var(--color-red-glow);
+  animation: marker-pulse 1.5s ease-in-out infinite;
+}
+
+.alert-marker.defcon4 {
+  background: var(--color-green);
+  border-color: var(--color-green-light);
+  box-shadow: 0 0 10px var(--color-green);
+}
+
+.city-tooltip {
+  font-size: 12px;
+  font-weight: bold;
+  background: var(--overlay-bg);
+  color: var(--pico-primary-inverse);
+  border: 1px solid var(--overlay-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.city-tooltip.defcon2 {
+  color: var(--color-red-light);
+  border-color: var(--color-red);
+}
+
+.user-tooltip {
+  font-size: 11px;
+  font-weight: bold;
+  background: var(--overlay-bg-mid);
+  color: var(--pico-primary-inverse);
+  border: 1px solid var(--overlay-border-light);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.user-tooltip::before {
+  display: none;
+}
+
+/* ---- Positive messages (DEFCON 2 transition) ---- */
+
+.positive-msg-el {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  font-size: 1.4em;
+  font-weight: bold;
+  color: var(--pico-primary-inverse);
+  background: var(--overlay-bg-light);
+  padding: 8px 16px;
+  border-radius: 8px;
+  text-shadow:
+    0 0 8px var(--shadow-text),
+    0 2px 4px var(--shadow-text-light);
+  animation: float-up 3.5s ease-out forwards;
+}

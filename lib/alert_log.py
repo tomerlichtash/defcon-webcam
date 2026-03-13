@@ -1,0 +1,89 @@
+"""Alert event log."""
+
+import json
+import os
+import tempfile
+import time
+
+LOG_FILE = os.path.join(tempfile.gettempdir(), "mjpg-alert-log.json")
+MAX_ENTRIES = 100
+
+
+def _unified_log(event_type, **kwargs):
+    """Write to unified event log (best-effort)."""
+    try:
+        from lib.event_log import log_event as _log
+
+        _log(event_type, **kwargs)
+    except Exception:
+        pass
+
+
+def log_event(defcon, raw_data=None):
+    """Append a DEFCON state change to the log file."""
+    entry = {
+        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "defcon": defcon,
+    }
+    if raw_data:
+        entry["raw"] = raw_data
+
+    entries = load_log()
+    entries.insert(0, entry)
+    entries = entries[:MAX_ENTRIES]
+
+    try:
+        with open(LOG_FILE, "w") as f:
+            json.dump(entries, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"alert_log write error: {e}", flush=True)
+
+    # Also write to unified event log
+    _unified_log("alert", defcon=defcon, raw=raw_data)
+
+
+def load_log():
+    """Load the event log from disk."""
+    try:
+        with open(LOG_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+SCAN_LOG_FILE = os.path.join(tempfile.gettempdir(), "mjpg-scan-log.json")
+MAX_SCAN_ENTRIES = 50
+
+
+def log_scan(source, raw_text, result):
+    """Log every API poll result for debugging."""
+    entry = {
+        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "source": source,
+        "result": result,
+        "data": raw_text[:500] if raw_text else "",
+    }
+
+    entries = load_scan_log()
+    entries.insert(0, entry)
+    entries = entries[:MAX_SCAN_ENTRIES]
+
+    try:
+        with open(SCAN_LOG_FILE, "w") as f:
+            json.dump(entries, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"scan_log write error: {e}", flush=True)
+
+    # Also write to unified event log
+    _unified_log(
+        "scan", source=source, result=result, data=raw_text[:500] if raw_text else ""
+    )
+
+
+def load_scan_log():
+    """Load the scan log from disk."""
+    try:
+        with open(SCAN_LOG_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return []

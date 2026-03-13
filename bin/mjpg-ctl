@@ -1,0 +1,219 @@
+#!/bin/bash
+CONF="/etc/mjpg-streamer.conf"
+SERVICE="mjpg-streamer"
+LAUNCHER="/usr/local/bin/mjpg-rotated.sh"
+FONT='DejaVu Sans'
+SWITCH_FILE="/etc/mjpg-next-switch"
+
+# Load current config or defaults
+if [ -f "$CONF" ]; then
+  source "$CONF"
+else
+  MODE="day"
+  ROTATE="0"
+  RES="high"
+  BRIGHT="58"
+FPS="15"
+ZOOM="100"
+fi
+: "${RES:=high}"
+: "${BRIGHT:=58}"
+: "${FPS:=15}"
+: "${ZOOM:=100}"
+: "${ROTATE:=0}"
+: "${MODE:=day}"
+
+usage() {
+  echo "Usage: mjpg-ctl <command>"
+  echo ""
+  echo "  day           - Manual low exposure (bright sun)"
+  echo "  night         - Auto exposure, high gain (dark scenes)"
+  echo "  indoor        - Auto exposure, moderate (indoor use)"
+  echo "  rotate 0      - No rotation"
+  echo "  rotate 90     - Rotate 90° clockwise"
+  echo "  rotate 180    - Rotate 180°"
+  echo "  rotate 270    - Rotate 270° clockwise"
+  echo "  res low       - 640x480"
+  echo "  res mid       - 1280x720"
+  echo "  res high      - 1920x1080"
+  echo "  bright 0-100  - Set brightness (0=darkest, 100=brightest)"
+  echo "  status        - Show current settings"
+  echo "  focus         - Trigger autofocus"
+  echo ""
+}
+
+save_conf() {
+  sudo tee "$CONF" > /dev/null <<EOF
+MODE="$MODE"
+ROTATE="$ROTATE"
+RES="$RES"
+BRIGHT="$BRIGHT"
+FPS="$FPS"
+ZOOM="$ZOOM"
+EOF
+}
+
+get_video_size() {
+  case "$RES" in
+    mid)  echo "1280x720" ;;
+    high) echo "1920x1080" ;;
+    *)    echo "640x480" ;;
+  esac
+}
+
+apply() {
+  local VIDEO_SIZE
+  VIDEO_SIZE=$(get_video_size)
+
+  local V4L2_BRIGHT=$(( BRIGHT * 255 / 100 ))
+
+  local V4L2_CMD
+  case "$MODE" in
+    day)
+      V4L2_CMD="v4l2-ctl --device=/dev/video0 --set-ctrl=auto_exposure=1 --set-ctrl=exposure_time_absolute=3 --set-ctrl=gain=0 --set-ctrl=brightness=$V4L2_BRIGHT --set-ctrl=backlight_compensation=1 --set-ctrl=contrast=80"
+      ;;
+    night)
+      V4L2_CMD="v4l2-ctl --device=/dev/video0 --set-ctrl=auto_exposure=3 --set-ctrl=gain=255 --set-ctrl=brightness=$V4L2_BRIGHT"
+      ;;
+    indoor)
+      V4L2_CMD="v4l2-ctl --device=/dev/video0 --set-ctrl=auto_exposure=3 --set-ctrl=gain=128 --set-ctrl=brightness=$V4L2_BRIGHT"
+      ;;
+  esac
+
+  local EQ_FILTER=""
+  if [ "$MODE" = "day" ]; then
+    EQ_FILTER=""
+  fi
+
+  local ROT_FILTER=""
+  case "$ROTATE" in
+    90)  ROT_FILTER="transpose=1," ;;
+    180) ROT_FILTER="transpose=1,transpose=1," ;;
+    270) ROT_FILTER="transpose=2," ;;
+  esac
+
+  # Read next switch time
+  local NEXT_SWITCH=""
+  if [ -f "$SWITCH_FILE" ]; then
+    NEXT_SWITCH=" | next $(cat $SWITCH_FILE | tr ":" ".")"
+  fi
+
+    # Scale font sizes proportionally to resolution height (base: 720p)
+    local HEIGHT=$(echo $VIDEO_SIZE | cut -d'x' -f2)
+    local FS_DEFCON=$((28 * HEIGHT / 720)); [ "$FS_DEFCON" -lt 18 ] && FS_DEFCON=18
+    local FS_TIME=$((14 * HEIGHT / 720)); [ "$FS_TIME" -lt 10 ] && FS_TIME=10
+    local FS_OSD=$((12 * HEIGHT / 720)); [ "$FS_OSD" -lt 10 ] && FS_OSD=10
+    local BW_DEFCON=$((2 * HEIGHT / 720))
+    [ "$BW_DEFCON" -lt 1 ] && BW_DEFCON=1
+
+    local OSD="${MODE} | ${RES} ${VIDEO_SIZE} | rot ${ROTATE} | ${FPS}fps | bright ${BRIGHT}%${NEXT_SWITCH}"
+  echo "$OSD" > /tmp/mjpg-osd.txt
+
+  sudo bash -c "cat > $LAUNCHER" <<EOLAUNCHER
+#!/bin/bash
+
+$V4L2_CMD
+
+/usr/local/bin/mjpg_streamer \\
+  -i "input_uvc.so -d /dev/video0 -r $VIDEO_SIZE -f $FPS" \\
+  -o "output_http.so -p 8080 -w /usr/local/share/mjpg-streamer/www"
+EOLAUNCHER
+  sudo chmod +x "$LAUNCHER"
+
+  save_conf
+  sudo systemctl restart "$SERVICE"
+  echo "Applied: mode=$MODE, rotate=$ROTATE, res=$RES ($VIDEO_SIZE), brightness=$BRIGHT%"
+}
+
+apply_bright_live() {
+  local V4L2_BRIGHT=$(( BRIGHT * 255 / 100 ))
+  v4l2-ctl --device=/dev/video0 --set-ctrl=brightness=$V4L2_BRIGHT
+  # Update OSD with new brightness
+  local VIDEO_SIZE
+  VIDEO_SIZE=$(get_video_size)
+  local NEXT_SWITCH=""
+  if [ -f "$SWITCH_FILE" ]; then
+    NEXT_SWITCH=" | next $(cat $SWITCH_FILE | tr ":" ".")"
+  fi
+  echo "${MODE} | ${RES} ${VIDEO_SIZE} | rot ${ROTATE} | ${FPS}fps | bright ${BRIGHT}%${NEXT_SWITCH}" > /tmp/mjpg-osd.txt
+  save_conf
+  echo "Brightness set to $BRIGHT% (v4l2: $V4L2_BRIGHT/255)"
+}
+
+case "$1" in
+  day)
+    MODE="day"
+    apply
+    ;;
+  night)
+    MODE="night"
+    apply
+    ;;
+  indoor)
+    MODE="indoor"
+    apply
+    ;;
+  rotate)
+    if [ -z "$2" ]; then
+      echo "Usage: mjpg-ctl rotate <0|90|180|270>"
+      exit 1
+    fi
+    ROTATE="$2"
+    apply
+    ;;
+  res)
+    if [ -z "$2" ]; then
+      echo "Usage: mjpg-ctl res <low|mid|high>"
+      exit 1
+    fi
+    RES="$2"
+    apply
+    ;;
+  zoom)
+    if [ -z "$2" ] || [ "$2" -lt 100 ] 2>/dev/null || [ "$2" -gt 500 ] 2>/dev/null; then
+      echo "Usage: mjpg-ctl zoom <100-500>"
+      exit 1
+    fi
+    ZOOM="$2"
+    v4l2-ctl --device=/dev/video0 --set-ctrl=zoom_absolute=$ZOOM
+    save_conf
+    echo "Zoom set to ${ZOOM} (1x-5x)"
+    ;;
+  fps)
+    if [ -z "$2" ]; then
+      echo "Usage: mjpg-ctl fps <5-30>"
+      exit 1
+    fi
+    FPS="$2"
+    apply
+    ;;
+  bright)
+    if [ -z "$2" ] || [ "$2" -lt 0 ] 2>/dev/null || [ "$2" -gt 100 ] 2>/dev/null; then
+      echo "Usage: mjpg-ctl bright <0-100>"
+      exit 1
+    fi
+    BRIGHT="$2"
+    apply_bright_live
+    ;;
+  status)
+    echo "Mode: $MODE"
+    echo "Rotation: ${ROTATE}°"
+    echo "Resolution: $RES ($(get_video_size))"
+    echo "Brightness: $BRIGHT%"
+    echo "FPS: $FPS"
+    echo "Zoom: $ZOOM (1x-5x)"
+    if [ -f "$SWITCH_FILE" ]; then
+      echo "Next switch: $(cat $SWITCH_FILE)"
+    fi
+    systemctl is-active "$SERVICE" 2>/dev/null && echo "Service: running" || echo "Service: stopped"
+    ;;
+  focus)
+    v4l2-ctl --device=/dev/video0 --set-ctrl=focus_automatic_continuous=0
+    sleep 1
+    v4l2-ctl --device=/dev/video0 --set-ctrl=focus_automatic_continuous=1
+    echo "Refocused"
+    ;;
+  *)
+    usage
+    ;;
+esac
