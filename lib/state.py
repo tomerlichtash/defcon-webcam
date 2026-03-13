@@ -1,4 +1,4 @@
-"""DEFCON state management — persistence and OSD display."""
+"""DEFCON state management — persistence."""
 
 import os
 import tempfile
@@ -26,17 +26,3 @@ def load_state():
             return f.read().strip()
     except Exception:
         return "idle"
-
-
-def set_display(idle=" ", alert=" ", defcon4=" "):
-    """Write OSD text files. Defaults to space (ffmpeg requires non-empty)."""
-    for path, text in [
-        (config.IDLE_FILE, idle),
-        (config.ALERT_FILE, alert),
-        (config.DEFCON4_FILE, defcon4),
-    ]:
-        try:
-            with open(path, "w") as f:
-                f.write(text)
-        except Exception:
-            pass

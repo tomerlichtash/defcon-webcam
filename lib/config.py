@@ -19,9 +19,6 @@ IS_LINUX = platform.system() == "Linux"
 HAS_CAMERA = IS_LINUX
 
 _TMP = tempfile.gettempdir()
-ALERT_FILE = os.path.join(_TMP, "mjpg-alert.txt")
-IDLE_FILE = os.path.join(_TMP, "mjpg-idle.txt")
-DEFCON4_FILE = os.path.join(_TMP, "mjpg-clear.txt")
 SNAPSHOT_PATH = os.path.join(_TMP, "mjpg-tweet.jpg")
 STATE_FILE = os.path.join(_TMP, "mjpg-alert-state")
 

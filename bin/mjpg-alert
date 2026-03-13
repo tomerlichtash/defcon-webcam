@@ -12,7 +12,7 @@ sys.path.insert(0, _root)
 
 from lib.config import CHECK_INTERVAL, WATCH_TERMS, HAS_CAMERA
 from lib.oref import backoff_delay
-from lib.state import save_state, load_state, set_display
+from lib.state import save_state, load_state
 from lib import state as state_mod
 from lib.oref import check_alerts
 from lib.alert_log import log_event
@@ -54,18 +54,13 @@ def main():
     # Restore persisted state
     state_mod.state = load_state()
     if state_mod.state == "defcon2":
-        ts = time.strftime("%H:%M:%S")
-        set_display(alert=f"INCOMING MISSILES - {ts}")
         apply_camera_profile("alert")
         print("Resuming in DEFCON 2 (persisted state)", flush=True)
     elif state_mod.state == "defcon4":
-        ts = time.strftime("%H:%M:%S")
-        set_display(defcon4=f"INCOMING ALERT - {ts}")
         apply_camera_profile("alert")
         print("Resuming in DEFCON 4 (persisted state)", flush=True)
     else:
         state_mod.state = "idle"
-        set_display(idle="CLEAR SKIES")
         apply_camera_profile("rest")
         print("Starting in DEFCON 5", flush=True)
 
@@ -79,7 +74,6 @@ def main():
                 log_event(5, raw_data)
                 state_mod.state = "idle"
                 save_state("idle")
-                set_display(idle="CLEAR SKIES")
                 apply_camera_profile("rest")
 
         elif result == "preemptive":
@@ -89,7 +83,6 @@ def main():
                 log_event(4, raw_data)
                 state_mod.state = "defcon4"
                 save_state("defcon4")
-                set_display(defcon4=f"INCOMING ALERT - {ts}")
                 apply_camera_profile("alert")
 
         elif result == "actual":
@@ -99,7 +92,6 @@ def main():
                 log_event(2, raw_data)
                 state_mod.state = "defcon2"
                 save_state("defcon2")
-                set_display(alert=f"INCOMING MISSILES - {ts}")
                 apply_camera_profile("alert")
 
         time.sleep(CHECK_INTERVAL + backoff_delay())

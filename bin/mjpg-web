@@ -19,7 +19,7 @@ from lib.sysinfo import get_sysinfo, get_defcon
 from lib.geocode import init_geo_db, random_cities, lookup_many, city_count
 from lib.alert_log import load_log, load_scan_log, log_event as alert_log_event
 from lib.camera import take_snapshot
-from lib.state import save_state, set_display
+from lib.state import save_state
 from lib.event_log import (
     log_event,
     load_events,
@@ -248,21 +248,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 ts = _time.strftime("%H:%M:%S")
                 if level == "2":
                     save_state("defcon2")
-                    set_display(alert="INCOMING MISSILES - " + ts)
                     alert_log_event("DEFCON 2", {"source": "manual", "alert": True})
                     log_event("status", message="DEFCON 2 set manually")
                     _camera_ctl("start")
                     self._json_response({"output": "DEFCON 2 - INCOMING MISSILES"})
                 elif level == "4":
                     save_state("defcon4")
-                    set_display(defcon4="INCOMING ALERT - " + ts)
                     alert_log_event("DEFCON 4", {"source": "manual", "alert": True})
                     log_event("status", message="DEFCON 4 set manually")
                     _camera_ctl("start")
                     self._json_response({"output": "DEFCON 4 - INCOMING ALERT"})
                 elif level == "5":
                     save_state("idle")
-                    set_display(idle="CLEAR SKIES")
                     alert_log_event("DEFCON 5", None)
                     log_event("status", message="DEFCON 5 set manually")
                     _camera_ctl("stop")

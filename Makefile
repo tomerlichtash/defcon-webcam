@@ -3,7 +3,7 @@ PORT := 8081
 PID_WEB   = $(shell lsof -ti:$(PORT) 2>/dev/null)
 PID_ALERT = $(shell pgrep -f 'python3 bin/mjpg-alert' 2>/dev/null)
 
-.PHONY: start stop restart status test db-reset db-shell db-populate fmt
+.PHONY: start stop restart status test cover db-reset db-shell db-populate fmt
 
 start:
 	@if [ -n "$(PID_WEB)" ]; then echo "Web already running (PID $(PID_WEB))"; exit 1; fi
@@ -36,6 +36,9 @@ db-populate:
 
 test:
 	@source $(VENV) && python3 -m unittest discover -s tests -v
+
+cover:
+	@source $(VENV) && coverage run -m unittest discover -s tests && coverage report --include='lib/*,bin/*' --show-missing
 
 fmt:
 	@npx prettier --write 'static/js/**/*.js' 'static/styles/*.css' 'static/i18n/*.json'

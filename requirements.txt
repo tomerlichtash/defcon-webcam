@@ -1,0 +1,6 @@
+# Runtime (optional — app degrades gracefully without these)
+descope>=0.9.0
+tweepy>=4.0
+
+# Development / testing
+coverage>=7.0
