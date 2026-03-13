@@ -110,9 +110,9 @@ def is_authenticated(headers):
     for part in cookie_header.split(";"):
         part = part.strip()
         if part.startswith("admin_session="):
-            session_token = part[len("admin_session="):]
+            session_token = part[len("admin_session=") :]
         elif part.startswith("admin_refresh="):
-            refresh_token = part[len("admin_refresh="):]
+            refresh_token = part[len("admin_refresh=") :]
 
     if session_token and validate_session(session_token) is not None:
         return True, None

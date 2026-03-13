@@ -1,0 +1,115 @@
+/* Stars Outside — minimal global resets (replaces Pico CSS) */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--so-font-family);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--so-text);
+  background: var(--so-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--so-color-blue);
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: 1px solid var(--so-border);
+  border-radius: var(--so-radius);
+  background: none;
+  color: var(--so-text);
+  padding: 0.4em 0.8em;
+  line-height: 1.4;
+}
+
+button:hover {
+  border-color: var(--so-text);
+}
+
+button.outline {
+  background: none;
+  border: 1px solid var(--so-border);
+  color: var(--so-text);
+}
+
+button.outline:hover {
+  border-color: var(--so-text);
+}
+
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0.4em 0.6em;
+  border: 1px solid var(--so-border);
+  border-radius: var(--so-radius);
+  background: var(--so-bg);
+  color: var(--so-text);
+}
+
+input[type="range"] {
+  accent-color: var(--so-color-blue);
+}
+
+input[type="checkbox"] {
+  accent-color: var(--so-color-blue);
+}
+
+pre {
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+small {
+  font-size: 0.85em;
+}
+
+strong {
+  font-weight: bold;
+}
+
+nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Utility */
+
+.container-fluid {
+  width: 100%;
+}

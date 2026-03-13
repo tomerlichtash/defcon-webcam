@@ -4,13 +4,22 @@
 <title>Login - Stars Outside</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/static/vendor/pico.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Secular+One&display=swap">
+<link rel="stylesheet" href="/static/styles/theme.css">
+<link rel="stylesheet" href="/static/styles/base.css">
 <style>
   body { display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
   .login-box { width: 100%; max-width: 400px; padding: 20px; text-align: center; }
-  .login-box h2 { margin-bottom: 20px; }
-  .login-error { color: #e94560; font-size: 0.85em; margin-top: 10px; }
-  .login-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; font-size: 1rem; }
+  .login-box h2 { margin-bottom: 20px; color: var(--so-text); }
+  .login-error { color: var(--so-color-danger); font-size: 0.85em; margin-top: 10px; }
+  .login-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; font-size: 1rem;
+    color: var(--so-text); border: 1px solid var(--so-border); border-radius: var(--so-radius);
+    background: none; text-decoration: none; transition: border-color 0.15s;
+  }
+  .login-btn:hover { border-color: var(--so-text); }
   .login-btn svg { width: 20px; height: 20px; }
 </style>
 </head>

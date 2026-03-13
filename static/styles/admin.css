@@ -1,67 +1,31 @@
 /* Stars Outside — admin panel styles (loaded after style.css) */
 
-/* ---- Sidebar ---- */
+/* ---- Sidebar drawer ---- */
 
-.sidebar {
-  width: 320px;
-  position: fixed;
+#sidebar-drawer {
+  --size: 320px;
+}
+
+#sidebar-drawer::part(overlay) {
+  background: transparent;
+  pointer-events: none;
+}
+
+#sidebar-drawer::part(panel) {
+  background: var(--so-bg);
+  border-right: 1px solid var(--so-border);
   top: var(--top-bar-height, 40px);
-  left: 0;
-  z-index: 1200;
-  display: flex;
-  flex-direction: column;
   height: calc(100vh - var(--top-bar-height, 40px));
-  overflow-y: auto;
-  background: var(--pico-background-color);
-  border-right: 1px solid var(--pico-muted-border-color);
 }
 
-[dir="rtl"] .sidebar {
-  left: auto;
-  right: 0;
-  border-right: none;
-  border-left: 1px solid var(--pico-muted-border-color);
-}
-
-.sidebar article {
-  margin: 0;
+#sidebar-drawer::part(body) {
   padding: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
-.sidebar article > header {
-  font-size: 0.78em;
-  text-transform: uppercase;
-  font-weight: bold;
-  letter-spacing: 0.03em;
-  padding: 10px 12px;
-  margin: 0;
-  border-bottom: 1px solid var(--pico-muted-border-color);
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  user-select: none;
-  color: var(--pico-color);
-  background: none;
-}
-
-.sidebar article > header:hover {
-  color: var(--pico-primary);
-}
-
-.sidebar article > header > span:last-child {
-  font-size: 0.85em;
-  color: var(--pico-muted-color);
-}
-
-.sidebar input[type="text"],
-.sidebar input[type="number"],
-.sidebar select {
-  padding: 4px 8px;
-  font-size: 0.8em;
-  margin: 0;
-  height: auto;
+[dir="rtl"] #sidebar-drawer::part(panel) {
+  border-right: none;
+  border-left: 1px solid var(--so-border);
 }
 
 /* ---- Settings panel (camera, channels) ---- */
@@ -75,7 +39,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 5px 0;
-  border-bottom: var(--separator);
+  border-bottom: 1px solid var(--so-border-light);
   gap: 10px;
   font-size: 0.72em;
 }
@@ -94,181 +58,19 @@
   margin-left: 4px;
 }
 
-.setting-row [role="group"] {
-  margin-bottom: 0;
-  flex-shrink: 0;
-  display: inline-flex;
-  width: auto;
-  direction: ltr;
-}
-
-.setting-row [role="group"] button {
-  font-size: 0.85em;
-  padding: 0.15em 0.4em;
-  margin-bottom: 0;
-  line-height: 1.2;
-  width: auto;
-  flex: none;
-}
-
-.setting-row input[type="range"] {
-  margin: 0;
-  padding: 0;
-  height: 1.2em;
-  flex: 1;
-  min-width: 60px;
-}
-
-.setting-row input[type="checkbox"] {
-  transform: scale(0.75);
-  margin: 0;
-}
-
-/* ---- Control group (sysinfo panel) ---- */
-
-.control-group {
-  padding: 4px 12px;
-  user-select: none;
-}
-
-.control-group:last-child {
-  padding-bottom: 10px;
-}
-
-.control-group:first-child {
-  padding-top: 2px;
-}
-
-.control-group [role="group"] {
-  margin-bottom: 0;
-  direction: ltr;
-}
-
-.control-group [role="group"] button {
-  font-size: 0.68em;
-  padding: 0.25em 0.55em;
-  margin-bottom: 0;
-  flex: 1;
-}
-
-.control-group input[type="range"] {
-  margin: 0;
-  padding: 0;
-  height: 1.2em;
-  width: 100%;
-}
-
-.control-group label {
-  font-size: 0.78em;
-  margin-bottom: 2px;
-  display: flex;
-  align-items: center;
-}
-
-.control-group label input[type="checkbox"] {
-  margin: 0 8px 0 0;
-}
-
-.control-group button.outline {
-  width: 100%;
-}
-
 /* ---- Shared label style ---- */
 
 .sysinfo-label {
-  color: var(--pico-muted-color);
+  color: var(--so-text-muted);
   text-transform: uppercase;
   font-size: 0.85em;
-}
-
-/* ---- Sysinfo panel ---- */
-
-.sysinfo-section {
-  padding: 6px 0;
-  border-bottom: var(--separator);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.sysinfo-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.65em;
-  padding: 2px 0;
-}
-
-.spark-value {
-  display: inline-flex;
-  align-items: center;
-}
-
-.spark-value svg {
-  display: block;
-}
-
-/* Service status rows */
-
-.svc-row {
-  display: flex;
-  align-items: center;
-  padding: 2px 4px;
-  margin: 0 -4px;
-  border-radius: 4px;
-  cursor: default;
-  font-size: 0.72em;
-  transition: background 0.15s;
-}
-
-.svc-row:hover {
-  background: var(--overlay-white-subtle);
-}
-
-.svc-row .sysinfo-label {
-  flex: 1;
-}
-
-.svc-row .svc-restart-btn {
-  width: auto;
-  font-size: 0.65em;
-  padding: 0.1em 0.35em;
-  margin: 0;
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.svc-row:hover .svc-restart-btn {
-  opacity: 1;
-}
-
-.svc-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
-  flex-shrink: 0;
-}
-
-.svc-dot.up {
-  background: var(--color-ok);
-}
-
-.svc-dot.down {
-  background: var(--color-danger);
-}
-
-.svc-dot.warn {
-  background: var(--color-warn);
 }
 
 /* ---- Button variants ---- */
 
 .btn-danger {
-  color: var(--color-danger);
-  border-color: var(--color-danger);
+  color: var(--so-color-danger);
+  border-color: var(--so-color-danger);
   background: none;
   transition:
     background 0.2s,
@@ -276,24 +78,9 @@
 }
 
 .btn-danger:hover {
-  background: var(--color-danger);
-  color: var(--pico-primary-inverse);
-  border-color: var(--color-danger);
-}
-
-.btn-primary {
-  color: var(--pico-primary);
-  border-color: var(--pico-primary);
-  background: none;
-  transition:
-    background 0.2s,
-    color 0.2s;
-}
-
-.btn-primary:hover {
-  background: var(--pico-primary);
-  color: var(--pico-primary-inverse);
-  border-color: var(--pico-primary);
+  background: var(--so-color-danger);
+  color: var(--so-text-on-color);
+  border-color: var(--so-color-danger);
 }
 
 .controls-disabled {
@@ -301,245 +88,10 @@
   pointer-events: none;
 }
 
-/* ---- Camera header toggle ---- */
-
-.cam-header-toggle {
-  font-size: 0.6em;
-  padding: 0.1em 0.5em;
-  margin: 0;
-  min-width: 32px;
-}
-
-.cam-header-toggle.on {
-  color: var(--color-ok);
-  border-color: var(--color-ok);
-}
-
-.cam-header-toggle.off {
-  color: var(--color-danger);
-  border-color: var(--color-danger);
-}
-
-.cam-header-toggle.offline {
-  color: var(--pico-muted-color);
-  border-color: var(--pico-muted-border-color);
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ---- Event log ---- */
-
-.log-entries {
-  max-height: 300px;
-  overflow-y: auto;
-  padding: 0;
-}
-
-.log-entry {
-  padding: 0.3em 0;
-  border-bottom: 1px solid var(--pico-muted-border-color);
-  cursor: pointer;
-  display: grid;
-  grid-template-columns: 4px 50px 130px 1fr;
-  align-items: center;
-  gap: 0 10px;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--pico-color);
-}
-
-.log-entry:last-child {
-  border-bottom: none;
-}
-
-.log-entry pre {
-  margin: 0.3em 0 0;
-  font-size: 0.9em;
-  white-space: pre-wrap;
-  word-break: break-all;
-  grid-column: 1 / -1;
-  font-family: monospace;
-}
-
-.log-entry::before {
-  content: "";
-  width: 4px;
-  border-radius: 2px;
-  align-self: stretch;
-}
-
-.log-entry.type-alert::before {
-  background: var(--color-danger);
-}
-
-.log-entry.type-scan::before {
-  background: var(--pico-primary);
-}
-
-.log-entry.type-status::before {
-  background: var(--color-ok);
-}
-
-.log-entry.type-system::before {
-  background: var(--color-warn);
-}
-
-.log-badge {
-  border-radius: 3px;
-  padding: 0.1em 0.35em;
-}
-
-.log-badge.d2 {
-  background: var(--color-red);
-  color: var(--pico-primary-inverse);
-}
-
-.log-badge.d4 {
-  background: var(--color-green);
-  color: var(--pico-background-color);
-}
-
-.log-badge.d5 {
-  background: var(--pico-primary);
-  color: var(--pico-primary-inverse);
-}
-
-.log-source,
-.log-time,
-.log-type {
-  color: var(--pico-muted-color);
-}
-
-.log-type {
-  text-transform: uppercase;
-}
-
-.load-more {
-  text-align: center;
-  padding: 8px 0;
-}
-
-.load-more-btn {
-  font-size: 0.7em;
-  padding: 0.3em 1.2em;
-  margin: 0;
-}
-
-/* Log filter pills */
-
-.agg-filter {
-  font-size: 0.65em;
-  padding: 0.15em 0.5em;
-  border-radius: 10px;
-  border: 1px solid var(--pico-muted-border-color);
-  background: none;
-  color: var(--pico-muted-color);
-  cursor: pointer;
-  margin: 0;
-  transition: all 0.15s;
-}
-
-.agg-filter.active {
-  border-color: var(--pico-primary);
-  color: var(--pico-primary);
-}
-
-.agg-filter:hover {
-  border-color: var(--pico-color);
-  color: var(--pico-color);
-}
-
-/* Sidebar-specific log layout */
-
-.sidebar-log {
-  padding: 0 8px 8px;
-}
-
-.sidebar-log .log-entries {
-  max-height: 300px;
-}
-
-.sidebar-log-entry {
-  grid-template-columns: 4px 1fr;
-  font-size: 0.6em;
-}
-
-.sidebar-log-entry .log-type,
-.sidebar-log-entry .log-time {
-  display: none;
-}
-
-.sidebar-log-filters {
-  display: flex;
-  gap: 4px;
-  padding: 6px 0 4px;
-}
-
-/* ---- Admin panel ---- */
-
-.admin-inline-login {
-  padding: 6px 0;
-}
-
-.admin-inline-login descope-wc {
-  display: block;
-}
-
-.admin-auth-error {
-  color: var(--color-danger);
-  font-size: 0.75em;
-  margin: 4px 0 0;
-}
-
-.admin-section-label {
-  font-size: 0.65em;
-  text-transform: uppercase;
-  color: var(--pico-muted-color);
-  padding: 6px 0 2px;
-  border-top: var(--separator);
-  margin-top: 4px;
-  letter-spacing: 0.04em;
-}
-
-.admin-section-label:first-child {
-  border-top: none;
-  margin-top: 0;
-}
-
-.admin-num-input {
-  width: 60px;
-}
-
-.admin-action-btn {
-  font-size: 0.7em;
-  padding: 0.2em 0.6em;
-  margin: 0;
-}
-
-.admin-logout-btn {
-  font-size: 0.65em;
-  padding: 0.1em 0.35em;
-  margin: 0 0 0 6px;
-  color: var(--color-danger);
-  border-color: var(--color-danger);
-  background: none;
-  transition:
-    background 0.2s,
-    color 0.2s;
-}
-
-.admin-logout-btn:hover {
-  background: var(--color-danger);
-  color: var(--pico-primary-inverse);
-}
-
 /* ---- Responsive ---- */
 
 @media (max-width: 768px) {
-  .sidebar {
-    width: 100%;
-    position: relative;
-    border-left: none;
-    border-top: 1px solid var(--pico-muted-border-color);
+  #sidebar-drawer {
+    --size: 100%;
   }
 }

@@ -1,17 +1,30 @@
-/* Visual effects module — confetti and quote trivia */
-var EffectsModule = {
-  state: {
-    _positiveMsgTimer: null,
-  },
+/* Stars Outside — EffectsManager (confetti + quote trivia) */
+import { store } from "./store.js";
+
+export class EffectsManager {
+  constructor() {
+    this._positiveMsgTimer = null;
+    this._lastLevel = store.getState().defcon.level;
+
+    store.subscribe(() => {
+      const level = store.getState().defcon.level;
+      if (level !== this._lastLevel) {
+        const prev = this._lastLevel;
+        this._lastLevel = level;
+        if (prev && prev !== level) {
+          if (level === 5) this.fireConfetti();
+          if (level === 2) this.showPositiveMessages();
+          if (level !== 2) this.stopPositiveMessages();
+        }
+      }
+    });
+  }
 
   fireConfetti() {
     if (typeof ConfettiGenerator === "undefined") return;
-    /* Clear any lingering positive messages */
     this.stopPositiveMessages();
-    document.querySelectorAll(".positive-msg-el").forEach((el) => {
-      el.remove();
-    });
-    /* Create full-page canvas overlay */
+    document.querySelectorAll(".positive-msg-el").forEach((el) => el.remove());
+
     const canvas = document.createElement("canvas");
     canvas.style.cssText =
       "position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;pointer-events:none;";
@@ -35,31 +48,30 @@ var EffectsModule = {
       confetti.clear();
       canvas.remove();
     }, 6000);
-  },
+  }
 
   showPositiveMessages() {
-    /* Stop any existing loop first */
     this.stopPositiveMessages();
-    document.querySelectorAll(".positive-msg-el").forEach((el) => {
-      el.remove();
-    });
+    document.querySelectorAll(".positive-msg-el").forEach((el) => el.remove());
     this._showNextQuote();
-  },
+  }
 
   _showNextQuote() {
-    if (this.defcon !== 2) {
+    const level = store.getState().defcon.level;
+    if (level !== 2) {
       this._positiveMsgTimer = null;
       return;
     }
-    const lang = this.locale === "he" ? "he" : "en";
+    const locale = store.getState().ui.locale;
+    const lang = locale === "he" ? "he" : "en";
     fetch(`/api?cmd=quote&lang=${lang}`)
       .then((r) => r.json())
       .then((d) => {
         if (!d.quote) return;
-        /* Remove all existing messages right before adding the new one */
-        document.querySelectorAll(".positive-msg-el").forEach((el) => {
-          el.remove();
-        });
+        document
+          .querySelectorAll(".positive-msg-el")
+          .forEach((el) => el.remove());
+
         const el = document.createElement("div");
         el.className = "positive-msg-el";
         const x = 10 + Math.random() * 70;
@@ -77,7 +89,7 @@ var EffectsModule = {
 
         const tapHint = document.createElement("div");
         tapHint.textContent =
-          this.locale === "he"
+          locale === "he"
             ? "\u05dc\u05d7\u05e6\u05d5 \u05dc\u05d2\u05dc\u05d5\u05ea"
             : "tap to reveal";
         tapHint.style.cssText =
@@ -97,7 +109,7 @@ var EffectsModule = {
             });
         });
 
-        const slideFrom = this.locale === "he" ? "30px" : "-30px";
+        const slideFrom = locale === "he" ? "30px" : "-30px";
         el.animate(
           [
             { opacity: 0, transform: `translateX(${slideFrom})` },
@@ -107,22 +119,19 @@ var EffectsModule = {
           ],
           { duration: 10000, fill: "forwards", easing: "ease-out" },
         );
+
         document.body.appendChild(el);
-        this._positiveMsgTimer = setTimeout(() => {
-          this._showNextQuote();
-        }, 11000);
+        this._positiveMsgTimer = setTimeout(() => this._showNextQuote(), 11000);
       })
       .catch(() => {
-        this._positiveMsgTimer = setTimeout(() => {
-          this._showNextQuote();
-        }, 11000);
+        this._positiveMsgTimer = setTimeout(() => this._showNextQuote(), 11000);
       });
-  },
+  }
 
   stopPositiveMessages() {
     if (this._positiveMsgTimer) {
       clearTimeout(this._positiveMsgTimer);
       this._positiveMsgTimer = null;
     }
-  },
-};
+  }
+}

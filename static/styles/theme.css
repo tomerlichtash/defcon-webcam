@@ -1,0 +1,102 @@
+/* Stars Outside — design token layer
+   Loaded before everything else. Defines our tokens, Shoelace mapping, dark/light modes.
+   Naming: --so-* ("Stars Outside") to avoid collision with --sl-* (Shoelace). */
+
+/* ---- 1. Base tokens (dark mode default) ---- */
+
+:root {
+  /* Colors — semantic */
+  --so-color-ok: #4ecca3;
+  --so-color-danger: #e94560;
+  --so-color-warn: #f0a500;
+  --so-color-red: #ff0000;
+  --so-color-red-light: #ff4444;
+  --so-color-green: #00cc00;
+  --so-color-green-light: #00ee00;
+  --so-color-blue: #4488ff;
+
+  /* Colors — glow / shadow */
+  --so-color-red-glow: rgba(255, 0, 0, 0.5);
+  --so-color-red-glow-strong: rgba(255, 0, 0, 0.7);
+
+  /* Colors — surfaces */
+  --so-bg: #11191f;
+  --so-bg-overlay: rgba(0, 0, 0, 0.8);
+  --so-bg-overlay-mid: rgba(0, 0, 0, 0.7);
+  --so-bg-overlay-light: rgba(0, 0, 0, 0.5);
+  --so-text: #e0e0e0;
+  --so-text-muted: #888;
+  --so-text-on-color: #fff;
+  --so-border: rgba(255, 255, 255, 0.2);
+  --so-border-light: rgba(255, 255, 255, 0.08);
+  --so-border-subtle: rgba(255, 255, 255, 0.06);
+  --so-white-overlay: rgba(255, 255, 255, 0.4);
+  --so-white-overlay-light: rgba(255, 255, 255, 0.3);
+
+  /* Topbar */
+  --so-topbar-bg: rgba(0, 0, 0, 0.5);
+  --so-topbar-border: rgba(255, 255, 255, 0.1);
+
+  /* Typography */
+  --so-font-family: "Exo 2", "Secular One", -apple-system, sans-serif;
+  --so-font-size-xs: 0.6em;
+  --so-font-size-sm: 0.75em;
+  --so-font-size-base: 1em;
+  --so-font-size-lg: 1.4em;
+
+  /* Spacing */
+  --so-space-xs: 4px;
+  --so-space-sm: 8px;
+  --so-space-md: 12px;
+  --so-space-lg: 16px;
+  --so-space-xl: 24px;
+
+  /* Radii & shadows */
+  --so-radius: 4px;
+  --so-radius-lg: 8px;
+  --so-shadow-drop: rgba(0, 0, 0, 0.4);
+  --so-shadow-text: rgba(0, 0, 0, 0.6);
+  --so-shadow-text-light: rgba(0, 0, 0, 0.4);
+
+  /* Leaflet controls (always light) */
+  --so-leaflet-control-color: #333;
+  --so-leaflet-control-bg: #fff;
+  --so-leaflet-control-bg-hover: #f4f4f4;
+  --so-leaflet-control-border: #ccc;
+}
+
+/* ---- 2. Light mode overrides ---- */
+
+[data-theme="light"] {
+  --so-bg: #f8f9fa;
+  --so-bg-overlay: rgba(255, 255, 255, 0.9);
+  --so-bg-overlay-mid: rgba(255, 255, 255, 0.8);
+  --so-bg-overlay-light: rgba(255, 255, 255, 0.5);
+  --so-text: #1a1a2e;
+  --so-text-muted: #666;
+  --so-text-on-color: #fff;
+  --so-border: rgba(0, 0, 0, 0.15);
+  --so-border-light: rgba(0, 0, 0, 0.08);
+  --so-border-subtle: rgba(0, 0, 0, 0.04);
+  --so-white-overlay: rgba(0, 0, 0, 0.2);
+  --so-white-overlay-light: rgba(0, 0, 0, 0.1);
+
+  --so-topbar-bg: rgba(255, 255, 255, 0.5);
+  --so-topbar-border: rgba(0, 0, 0, 0.1);
+}
+
+/* ---- 3. Map to Shoelace tokens ---- */
+
+:root {
+  --sl-color-primary-600: var(--so-color-blue);
+  --sl-color-success-600: var(--so-color-ok);
+  --sl-color-warning-600: var(--so-color-warn);
+  --sl-color-danger-600: var(--so-color-danger);
+  --sl-color-neutral-0: var(--so-bg);
+  --sl-color-neutral-1000: var(--so-text);
+  --sl-font-sans: var(--so-font-family);
+  --sl-input-border-radius-medium: var(--so-radius);
+  --sl-spacing-small: var(--so-space-sm);
+  --sl-spacing-medium: var(--so-space-md);
+  --sl-spacing-large: var(--so-space-lg);
+}

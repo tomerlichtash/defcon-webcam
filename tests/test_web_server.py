@@ -198,69 +198,42 @@ class TestAlertDeadCodeRemoved(unittest.TestCase):
 
 
 class TestStreamListenerCleanup(unittest.TestCase):
-    """initCamera() must clean up previous event listeners to prevent stacking."""
+    """Camera component must clean up stream watchers in disconnectedCallback."""
 
-    def test_removes_old_error_listener(self):
-        """initCamera must remove or guard against duplicate error listeners."""
-        cam_path = os.path.join(_root, "static", "js", "camera.js")
+    def test_disconnected_callback_clears_watchdog(self):
+        """camera-content component must clear watchdog on disconnect."""
+        cam_path = os.path.join(_root, "static", "js", "components", "camera-content.js")
         with open(cam_path) as f:
             source = f.read()
-        fn_start = source.find("initCamera()")
-        fn_end = source.find("\n  },", fn_start)
-        fn_body = source[fn_start:fn_end]
-        has_cleanup = ("removeEventListener" in fn_body
-                       or "_errorListenerAdded" in fn_body
-                       or "once:" in fn_body
-                       or "._errorHandler" in fn_body)
-        self.assertTrue(has_cleanup,
-                        "initCamera adds error listeners without cleanup — "
-                        "multiple calls will stack duplicate listeners")
+        self.assertIn("disconnectedCallback", source,
+                       "camera-content has no disconnectedCallback — "
+                       "stream watchdog will leak on component removal")
+        self.assertIn("clearInterval", source,
+                       "camera-content disconnectedCallback does not clear watchdog")
 
 
 class TestXSSServiceNames(unittest.TestCase):
-    """Service names containing HTML/JS must be escaped in servicesRows output."""
+    """Lit templates use tagged template literals which auto-escape by default.
+    This test verifies the sysinfo component uses Lit html`` templates,
+    not innerHTML, for rendering service rows."""
 
-    @staticmethod
-    def _esc_html(s):
-        return html.escape(s)
-
-    @classmethod
-    def _simulate_services_rows(cls, services):
-        """Simulate the JS servicesRows getter in Python to check for XSS."""
-        labels = {"alert": "Alert", "web": "Web"}
-        rows = []
-        for name, svc_state in services.items():
-            safe_name = cls._esc_html(name)
-            label = labels.get(name, safe_name)
-            is_down = svc_state != "active"
-            action = "svcStart" if is_down else "svcRestart"
-            attr_name = safe_name.replace("'", "&#39;")
-            row = (
-                f'<div class="svc-row"><span class="svc-dot down"></span>'
-                f'<span class="sysinfo-label">{label}</span>'
-                f'<button class="outline btn-primary svc-restart-btn" '
-                f"onclick=\"document.querySelector('[x-data]')._x_dataStack[0]"
-                f'.{action}(\'{attr_name}\')">'
-                f"Start</button></div>"
-            )
-            rows.append(row)
-        return "".join(rows)
-
-    def test_html_in_service_name_is_escaped(self):
-        """Service name with HTML tags must not appear unescaped in output."""
-        malicious = '<img src=x onerror=alert(1)>'
-        services = {malicious: "inactive"}
-        output = self._simulate_services_rows(services)
-        self.assertNotIn("<img", output.lower(),
-                         "XSS: HTML tag in service name rendered unescaped")
-
-    def test_quote_in_service_name_breaks_onclick(self):
-        """Service name with quotes must not break the onclick handler."""
-        malicious = "foo');alert('xss"
-        services = {malicious: "inactive"}
-        output = self._simulate_services_rows(services)
-        self.assertNotIn("alert('xss", output,
-                         "XSS: unescaped quote in service name breaks onclick")
+    def test_service_rows_use_lit_templates(self):
+        """sysinfo-content must render service rows with Lit html`` templates,
+        not innerHTML with string concatenation."""
+        sysinfo_path = os.path.join(_root, "static", "js", "components", "sysinfo-content.js")
+        with open(sysinfo_path) as f:
+            source = f.read()
+        # Find the _renderServiceRows method
+        fn_start = source.find("_renderServiceRows")
+        self.assertNotEqual(fn_start, -1,
+                            "sysinfo-content must have _renderServiceRows method")
+        fn_body = source[fn_start:fn_start + 800]
+        # Must use Lit html`` template, not string concatenation
+        self.assertIn("html`", fn_body,
+                       "service rows must use Lit html`` tagged template for XSS safety")
+        # Must not use onclick string handlers (old Alpine pattern)
+        self.assertNotIn("onclick=", fn_body,
+                         "service rows must not use onclick string handlers")
 
 
 if __name__ == "__main__":

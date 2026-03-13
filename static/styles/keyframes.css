@@ -1,7 +1,6 @@
 /* Stars Outside — shared keyframe animations */
 
-/* Override Pico's prefers-reduced-motion blanket kill — our alert
-   animations are functional (safety-critical), not decorative. */
+/* Our alert animations are functional (safety-critical), not decorative. */
 @media (prefers-reduced-motion: reduce) {
   .siren,
   .alert-marker.defcon2 {
@@ -12,12 +11,12 @@
 
 @keyframes siren-glow {
   from {
-    filter: drop-shadow(0 0 5px var(--color-red));
+    filter: drop-shadow(0 0 5px var(--so-color-red));
     opacity: 1;
   }
   to {
-    filter: drop-shadow(0 0 20px var(--color-red))
-      drop-shadow(0 0 40px var(--color-red));
+    filter: drop-shadow(0 0 20px var(--so-color-red))
+      drop-shadow(0 0 40px var(--so-color-red));
     opacity: 0.85;
   }
 }
@@ -26,13 +25,13 @@
   0%,
   100% {
     box-shadow:
-      0 0 10px var(--color-red),
-      0 0 20px var(--color-red-glow);
+      0 0 10px var(--so-color-red),
+      0 0 20px var(--so-color-red-glow);
   }
   50% {
     box-shadow:
-      0 0 20px var(--color-red),
-      0 0 40px var(--color-red-glow-strong);
+      0 0 20px var(--so-color-red),
+      0 0 40px var(--so-color-red-glow-strong);
   }
 }
 
