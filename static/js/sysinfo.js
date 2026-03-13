@@ -76,7 +76,7 @@ var SysinfoModule = {
     return el.innerHTML;
   },
   get servicesRows() {
-    const labels = { "mjpg-alert": "Alert", "mjpg-web": "Web" };
+    const labels = { "alert": "Alert", "web": "Web" };
     const keys = Object.keys(this.services);
     return keys
       .map((name) => {

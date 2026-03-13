@@ -24,9 +24,9 @@ Camera surveillance system running on a Raspberry Pi with a Logitech BRIO webcam
     ├── bin/                    # Executable scripts
     │   ├── mjpg-ctl           # Main control script (presets, launcher generation)
     │   ├── mjpg-rotated.sh    # Auto-generated ffmpeg pipeline + mjpg-streamer
-    │   ├── mjpg-auto          # Sunrise/sunset day/night auto-switcher (cron)
-    │   ├── mjpg-alert         # Alert monitor orchestrator
-    │   └── mjpg-web           # Web control panel server (port 8081)
+    │   ├── daylight          # Sunrise/sunset day/night auto-switcher (cron)
+    │   ├── alert             # Alert monitor orchestrator
+    │   └── web               # Web control panel server (port 8081)
     ├── lib/                   # Shared Python modules
     │   ├── config.py          # Constants, config file parsing
     │   ├── state.py           # DEFCON state persistence and OSD display
@@ -82,15 +82,15 @@ Camera surveillance system running on a Raspberry Pi with a Logitech BRIO webcam
 
        sudo ln -sf ~/defcon-cam/bin/mjpg-ctl /usr/local/bin/mjpg-ctl
        sudo ln -sf ~/defcon-cam/bin/mjpg-rotated.sh /usr/local/bin/mjpg-rotated.sh
-       sudo ln -sf ~/defcon-cam/bin/mjpg-auto /usr/local/bin/mjpg-auto
-       sudo ln -sf ~/defcon-cam/bin/mjpg-alert /usr/local/bin/mjpg-alert
-       sudo ln -sf ~/defcon-cam/bin/mjpg-web /usr/local/bin/mjpg-web
+       sudo ln -sf ~/defcon-cam/bin/daylight /usr/local/bin/daylight
+       sudo ln -sf ~/defcon-cam/bin/alert /usr/local/bin/alert
+       sudo ln -sf ~/defcon-cam/bin/web /usr/local/bin/web
 
 3. Symlink and enable services:
 
        sudo ln -sf ~/defcon-cam/systemd/*.service /etc/systemd/system/
        sudo systemctl daemon-reload
-       sudo systemctl enable mjpg-streamer mjpg-alert mjpg-web
+       sudo systemctl enable mjpg-streamer alert web
 
 4. Create Twitter config:
 
@@ -111,7 +111,7 @@ Camera surveillance system running on a Raspberry Pi with a Logitech BRIO webcam
 6. Set up auto day/night cron:
 
        crontab -e
-       # Add: */15 * * * * /usr/local/bin/mjpg-auto --quiet >> /tmp/mjpg-auto.log 2>&1
+       # Add: */15 * * * * /usr/local/bin/daylight --quiet >> /tmp/daylight.log 2>&1
 
 7. Generate launcher and start:
 
@@ -167,7 +167,7 @@ State transitions:
 
 On DEFCON 2, after a 15-second confirmation delay, snapshots are posted to Twitter and Telegram.
 
-State is persisted to `/tmp/mjpg-alert-state` so restarts don't lose DEFCON status.
+State is persisted to `/tmp/alert-state` so restarts don't lose DEFCON status.
 
 ## Event Log
 
@@ -175,7 +175,7 @@ All events (alerts, scans, commands, service state changes, temperature warnings
 
 Event types:
 - **alert** — DEFCON state changes (from real alerts or manual `defcon` API command)
-- **scan** — API poll results from mjpg-alert
+- **scan** — API poll results from alert monitor
 - **status** — Commands executed, service restarts, publish actions
 - **system** — Service state changes, DEFCON transitions, temperature warnings
 

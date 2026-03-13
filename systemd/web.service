@@ -1,11 +1,11 @@
 [Unit]
-Description=MJPG Streamer Web Control Panel
+Description=Web Control Panel
 After=mjpg-streamer.service
 
 [Service]
 Type=simple
 User=tomer
-ExecStart=/usr/local/bin/mjpg-web
+ExecStart=/usr/local/bin/web
 Restart=on-failure
 RestartSec=5
 

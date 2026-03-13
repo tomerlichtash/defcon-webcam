@@ -20,7 +20,7 @@ class TestUnauthenticatedAPI(unittest.TestCase):
 
     def _get_api_block(self):
         """Extract the /api handler block from the server source."""
-        server_path = os.path.join(_root, "bin", "mjpg-web")
+        server_path = os.path.join(_root, "bin", "web")
         with open(server_path) as f:
             source = f.read()
         api_start = re.search(r'if self\.path\.startswith\(["\']\/api', source)
@@ -75,7 +75,7 @@ class TestPathTraversal(unittest.TestCase):
 
     def test_dotdot_in_static_path_is_blocked(self):
         """Request to /static/../../lib/auth.py must not serve the file."""
-        server_path = os.path.join(_root, "bin", "mjpg-web")
+        server_path = os.path.join(_root, "bin", "web")
         with open(server_path) as f:
             source = f.read()
 
@@ -108,7 +108,7 @@ class TestRaceCondition(unittest.TestCase):
 
     def test_detect_changes_is_thread_safe(self):
         """Concurrent _detect_changes calls must not raise or corrupt state."""
-        server_path = os.path.join(_root, "bin", "mjpg-web")
+        server_path = os.path.join(_root, "bin", "web")
         with open(server_path) as f:
             source = f.read()
 

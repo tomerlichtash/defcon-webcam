@@ -5,7 +5,7 @@ import os
 import tempfile
 import time
 
-LOG_FILE = os.path.join(tempfile.gettempdir(), "mjpg-alert-log.json")
+LOG_FILE = os.path.join(tempfile.gettempdir(), "alert-log.json")
 MAX_ENTRIES = 100
 
 
@@ -51,7 +51,7 @@ def load_log():
         return []
 
 
-SCAN_LOG_FILE = os.path.join(tempfile.gettempdir(), "mjpg-scan-log.json")
+SCAN_LOG_FILE = os.path.join(tempfile.gettempdir(), "scan-log.json")
 MAX_SCAN_ENTRIES = 50
 
 

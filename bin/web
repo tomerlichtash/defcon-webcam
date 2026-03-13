@@ -36,7 +36,7 @@ import threading
 import time as _time
 
 PORT = 8081
-ALLOWED_SVCS = {"mjpg-alert", "mjpg-streamer", "mjpg-web"}
+ALLOWED_SVCS = {"alert", "mjpg-streamer", "web"}
 
 # Server-side state tracking for change detection
 _prev_state = {"services": {}, "defcon": None, "temp": None}
@@ -222,7 +222,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     action, svc = parts[1], parts[2]
                     if action in ("restart", "start") and svc in ALLOWED_SVCS:
                         log_event("status", message=f"{action.title()}ing {svc}...")
-                        if svc == "mjpg-web":
+                        if svc == "web":
                             self._json_response({"output": f"Restarting {svc}..."})
                             subprocess.Popen(
                                 ["sudo", "systemctl", "restart", svc], close_fds=True
@@ -277,7 +277,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 log_event("status", message="Restarting web server...")
                 self._json_response({"output": "Restarting web server..."})
                 subprocess.Popen(
-                    ["sudo", "systemctl", "restart", "mjpg-web"], close_fds=True
+                    ["sudo", "systemctl", "restart", "web"], close_fds=True
                 )
                 return
 

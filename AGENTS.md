@@ -13,24 +13,23 @@ DefconCam is a Raspberry Pi camera surveillance system with missile alert monito
       ├── calls → v4l2-ctl (camera hardware controls)
       └── restarts → mjpg-streamer.service
 
-    bin/mjpg-alert (Python, alert monitor orchestrator)
+    bin/alert (Python, alert monitor orchestrator)
       ├── imports → lib/oref (Pikud HaOref API client)
-      ├── imports → lib/state (DEFCON state + OSD display)
-      ├── imports → lib/twitter (tweet posting)
-      ├── imports → lib/telegram (Telegram posting)
+      ├── imports → lib/state (DEFCON state persistence)
+      ├── imports → lib/alert_log (event logging)
       └── imports → lib/config (shared constants)
 
-    bin/mjpg-auto (Python, cron every 15min)
+    bin/daylight (Python, cron every 15min)
       ├── imports → lib/config (get_current_mode)
       └── calls → mjpg-ctl day/night
 
-    bin/mjpg-web (Python HTTP server, port 8081)
+    bin/web (Python HTTP server, port 8081)
       ├── imports → lib/sysinfo (system status)
       ├── imports → lib/camera (take_snapshot for publish)
       ├── imports → lib/telegram (send_telegram for publish)
       ├── imports → lib/twitter (send_tweet for publish)
       ├── imports → lib/event_log (unified SQLite event log)
-      ├── imports → lib/state (save_state, set_display for defcon command)
+      ├── imports → lib/state (save_state for defcon command)
       ├── imports → lib/alert_log (log_event for defcon command)
       └── calls → mjpg-ctl via subprocess (camera controls)
 
@@ -65,28 +64,20 @@ All scripts in `bin/` are symlinked to `/usr/local/bin/`. Do not edit files in `
 - DEFCON 4: preemptive alert received for watched cities
 - DEFCON 2: actual missile alert. Can transition from idle or DEFCON 4.
 - Only transition back to idle on explicit "האירוע הסתיים" from the API. Empty API response does NOT clear the alert.
-- State is persisted to `/tmp/mjpg-alert-state`. Always read it on startup to survive restarts.
-
-### OSD Labels
-- Files: `/tmp/mjpg-idle.txt`, `/tmp/mjpg-alert.txt`, `/tmp/mjpg-clear.txt`, `/tmp/mjpg-osd.txt`
-- These MUST exist before ffmpeg starts or it will crash.
-- Write a space `" "` to clear a file, never write empty string `""` — ffmpeg's textfile reload ignores empty files.
-- `mjpg-rotated.sh` creates these on startup as a safety net.
-- OSD shows friendly labels: `CLEAR SKIES` (DEFCON 5), `INCOMING ALERT - HH:MM:SS` (DEFCON 4), `INCOMING MISSILES - HH:MM:SS` (DEFCON 2).
-- Web UI header shows the technical label: `DEFCON 5` / `DEFCON 4` / `DEFCON 2`.
+- State is persisted to `/tmp/alert-state`. Always read it on startup to survive restarts.
 
 ### Unified Event Log
 - All events stored in SQLite at `/tmp/defcon-events.db` (survives page refreshes, not reboots).
 - Event types: `alert`, `scan`, `status`, `system`.
-- `mjpg-web` logs commands, service restarts, publishes, and detects sysinfo state changes (service transitions, DEFCON changes, temp warnings).
-- `mjpg-alert` dual-writes via `alert_log.py` → `_unified_log()` → `event_log.log_event()`.
+- `bin/web` logs commands, service restarts, publishes, and detects sysinfo state changes (service transitions, DEFCON changes, temp warnings).
+- `bin/alert` dual-writes via `alert_log.py` → `_unified_log()` → `event_log.log_event()`.
 - Client fetches incrementally (`&since=` param), with pagination (`&offset=` param, 200 per page).
-- Pruning: background thread in `mjpg-web` runs hourly, removes entries older than 24h.
+- Pruning: background thread in `bin/web` runs hourly, removes entries older than 24h.
 - Reset: `dbreset` API command clears all events and vacuums the DB.
 
 ### DEFCON API Command
-- `defcon [2|4|5]` command in `mjpg-web` sets state, writes OSD, logs alert, and starts/stops camera.
-- Does NOT post to Twitter/Telegram (unlike real alerts via `mjpg-alert`).
+- `defcon [2|4|5]` command in `bin/web` sets state, logs alert, and starts/stops camera.
+- Does NOT post to Twitter/Telegram (unlike real alerts via `bin/alert`).
 - Useful for testing: `curl 'http://10.0.0.238:8081/api?cmd=defcon+2'`
 
 ### ffmpeg Filter Gotchas
@@ -101,8 +92,7 @@ All scripts in `bin/` are symlinked to `/usr/local/bin/`. Do not edit files in `
 - Changes to the ffmpeg filter chain, v4l2 settings, or OSD layout must be made in `mjpg-ctl`.
 
 ### Service Ordering
-- `mjpg-alert.service` must start before `mjpg-streamer.service` (configured via `After=` in systemd unit).
-- This ensures OSD text files exist before ffmpeg needs them.
+- `alert.service` must start before `mjpg-streamer.service` (configured via `After=` in systemd unit).
 
 ### Camera Hardware (Logitech BRIO)
 - Device: `/dev/video0`
@@ -131,7 +121,7 @@ All scripts in `bin/` are symlinked to `/usr/local/bin/`. Do not edit files in `
 ## File Locations
 
 ### In Repo (~/defcon-cam/)
-- `bin/` — executable scripts (mjpg-ctl, mjpg-alert, mjpg-auto, mjpg-web)
+- `bin/` — executable scripts (mjpg-ctl, alert, daylight, web)
 - `lib/` — shared Python modules
 - `templates/index.html` — web UI template
 - `static/fonts/` — Exo 2 font files
@@ -144,6 +134,5 @@ All scripts in `bin/` are symlinked to `/usr/local/bin/`. Do not edit files in `
 - `/etc/mjpg-telegram.conf` — Telegram bot token and chat ID
 - `/etc/mjpg-streamer.conf` — camera mode/settings (symlinked from config/)
 - `/etc/mjpg-next-switch` — next day/night switch time
-- `/tmp/mjpg-alert-state` — persisted DEFCON state
-- `/tmp/mjpg-*.txt` — OSD text files
+- `/tmp/alert-state` — persisted DEFCON state
 - `/tmp/defcon-events.db` — unified event log (SQLite)

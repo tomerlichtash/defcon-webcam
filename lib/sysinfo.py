@@ -125,7 +125,7 @@ def get_sysinfo():
     info = {}
 
     services = {}
-    svc_names = ["mjpg-alert"]
+    svc_names = ["alert"]
     for svc in svc_names:
         services[svc] = (
             _service_state_linux(svc) if IS_LINUX else _service_state_mac(svc)

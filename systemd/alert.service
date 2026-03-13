@@ -1,11 +1,11 @@
 [Unit]
-Description=MJPG Alert Monitor (Pikud HaOref)
+Description=Alert Monitor (Pikud HaOref)
 After=network-online.target
 
 [Service]
 Type=simple
 User=tomer
-ExecStart=/usr/local/bin/mjpg-alert
+ExecStart=/usr/local/bin/alert
 Restart=always
 RestartSec=5
 

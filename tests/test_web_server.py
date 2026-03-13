@@ -20,7 +20,7 @@ class TestSimulateCountValidation(unittest.TestCase):
     """The simulate command must clamp count to 1-1000 and handle bad input."""
 
     def _get_simulate_block(self):
-        server_path = os.path.join(_root, "bin", "mjpg-web")
+        server_path = os.path.join(_root, "bin", "web")
         with open(server_path) as f:
             source = f.read()
         m = re.search(r'if cmd == ["\']simulate["\']:', source)
@@ -56,7 +56,7 @@ class TestDefconMissingLevel(unittest.TestCase):
 
     def test_defcon_split_is_safe(self):
         """cmd.split()[1] must be guarded against IndexError."""
-        server_path = os.path.join(_root, "bin", "mjpg-web")
+        server_path = os.path.join(_root, "bin", "web")
         with open(server_path) as f:
             source = f.read()
 
@@ -82,7 +82,7 @@ class TestCamctlMissingAction(unittest.TestCase):
 
     def test_camctl_split_is_safe(self):
         """cmd.split()[1] must be guarded against IndexError."""
-        server_path = os.path.join(_root, "bin", "mjpg-web")
+        server_path = os.path.join(_root, "bin", "web")
         with open(server_path) as f:
             source = f.read()
 
@@ -110,7 +110,7 @@ class TestEmptyQuotesSafe(unittest.TestCase):
 
     def test_empty_quotes_returns_empty(self):
         """When quotes list is empty, server should return empty quote, not crash."""
-        server_path = os.path.join(_root, "bin", "mjpg-web")
+        server_path = os.path.join(_root, "bin", "web")
         with open(server_path) as f:
             source = f.read()
         m = re.search(r'if cmd == ["\']quote["\']:', source)
@@ -131,7 +131,7 @@ class TestCameraCtlHelper(unittest.TestCase):
 
     def test_camera_ctl_function_exists(self):
         """_camera_ctl should be defined as a standalone helper."""
-        server_path = os.path.join(_root, "bin", "mjpg-web")
+        server_path = os.path.join(_root, "bin", "web")
         with open(server_path) as f:
             source = f.read()
         self.assertIn("def _camera_ctl(", source,
@@ -139,7 +139,7 @@ class TestCameraCtlHelper(unittest.TestCase):
 
     def test_camera_ctl_handles_exceptions(self):
         """_camera_ctl must catch subprocess exceptions."""
-        server_path = os.path.join(_root, "bin", "mjpg-web")
+        server_path = os.path.join(_root, "bin", "web")
         with open(server_path) as f:
             source = f.read()
         fn_start = source.find("def _camera_ctl(")
@@ -150,7 +150,7 @@ class TestCameraCtlHelper(unittest.TestCase):
 
     def test_defcon_commands_use_camera_ctl(self):
         """Defcon set commands must use _camera_ctl, not inline subprocess."""
-        server_path = os.path.join(_root, "bin", "mjpg-web")
+        server_path = os.path.join(_root, "bin", "web")
         with open(server_path) as f:
             source = f.read()
 
@@ -171,25 +171,25 @@ class TestCameraCtlHelper(unittest.TestCase):
 
 
 class TestAlertDeadCodeRemoved(unittest.TestCase):
-    """The disabled tweet delay loop must be removed from mjpg-alert."""
+    """The disabled tweet delay loop must be removed from alert."""
 
     def test_no_tweet_delay_loop(self):
         """The 5-iteration tweet delay loop should not exist when publish is disabled."""
-        alert_path = os.path.join(_root, "bin", "mjpg-alert")
+        alert_path = os.path.join(_root, "bin", "alert")
         with open(alert_path) as f:
             source = f.read()
         self.assertNotIn("tweet_cancelled", source,
-                         "Dead tweet delay loop still present in mjpg-alert")
+                         "Dead tweet delay loop still present in alert")
 
     def test_unused_imports_removed(self):
         """post_tweet and post_telegram should not be imported when unused."""
-        alert_path = os.path.join(_root, "bin", "mjpg-alert")
+        alert_path = os.path.join(_root, "bin", "alert")
         with open(alert_path) as f:
             source = f.read()
         self.assertNotIn("post_tweet", source,
-                         "Unused post_tweet import still in mjpg-alert")
+                         "Unused post_tweet import still in alert")
         self.assertNotIn("post_telegram", source,
-                         "Unused post_telegram import still in mjpg-alert")
+                         "Unused post_telegram import still in alert")
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ class TestXSSServiceNames(unittest.TestCase):
     @classmethod
     def _simulate_services_rows(cls, services):
         """Simulate the JS servicesRows getter in Python to check for XSS."""
-        labels = {"mjpg-alert": "Alert", "mjpg-web": "Web"}
+        labels = {"alert": "Alert", "web": "Web"}
         rows = []
         for name, svc_state in services.items():
             safe_name = cls._esc_html(name)

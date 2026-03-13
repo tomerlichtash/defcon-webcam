@@ -20,7 +20,7 @@ HAS_CAMERA = IS_LINUX
 
 _TMP = tempfile.gettempdir()
 SNAPSHOT_PATH = os.path.join(_TMP, "mjpg-tweet.jpg")
-STATE_FILE = os.path.join(_TMP, "mjpg-alert-state")
+STATE_FILE = os.path.join(_TMP, "alert-state")
 
 if IS_LINUX:
     _CONF_DIR = "/etc"

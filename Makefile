@@ -1,17 +1,17 @@
 VENV := .venv/bin/activate
 PORT := 8081
 PID_WEB   = $(shell lsof -ti:$(PORT) 2>/dev/null)
-PID_ALERT = $(shell pgrep -f 'python3 bin/mjpg-alert' 2>/dev/null)
+PID_ALERT = $(shell pgrep -f 'python3 bin/alert' 2>/dev/null)
 
 .PHONY: start stop restart status test cover db-reset db-shell db-populate fmt
 
 start:
 	@if [ -n "$(PID_WEB)" ]; then echo "Web already running (PID $(PID_WEB))"; exit 1; fi
 	@echo "Starting alert service..."
-	@source $(VENV) && python3 bin/mjpg-alert &
+	@source $(VENV) && python3 bin/alert &
 	@sleep 1
 	@echo "Starting web server..."
-	source $(VENV) && python3 bin/mjpg-web
+	source $(VENV) && python3 bin/web
 
 stop:
 	@if [ -n "$(PID_ALERT)" ]; then kill $(PID_ALERT) && echo "Alert stopped (PID $(PID_ALERT))"; fi

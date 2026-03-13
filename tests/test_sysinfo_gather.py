@@ -160,18 +160,18 @@ class TestServiceStateMac(unittest.TestCase):
     def test_active(self, mock_run):
         mock_run.return_value = MagicMock(returncode=0)
         from lib.sysinfo import _service_state_mac
-        self.assertEqual(_service_state_mac("mjpg-alert"), "active")
+        self.assertEqual(_service_state_mac("alert"), "active")
 
     @patch("subprocess.run")
     def test_inactive(self, mock_run):
         mock_run.return_value = MagicMock(returncode=1)
         from lib.sysinfo import _service_state_mac
-        self.assertEqual(_service_state_mac("mjpg-alert"), "inactive")
+        self.assertEqual(_service_state_mac("alert"), "inactive")
 
     @patch("subprocess.run", side_effect=Exception("pgrep not found"))
     def test_error(self, _):
         from lib.sysinfo import _service_state_mac
-        self.assertEqual(_service_state_mac("mjpg-alert"), "unknown")
+        self.assertEqual(_service_state_mac("alert"), "unknown")
 
 
 if __name__ == "__main__":

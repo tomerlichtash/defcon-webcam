@@ -1,6 +1,6 @@
 [Unit]
 Description=MJPG Streamer
-After=network.target mjpg-alert.service
+After=network.target alert.service
 
 [Service]
 Type=simple
