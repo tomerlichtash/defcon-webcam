@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="/static/styles/style.css">
 <link rel="stylesheet" href="/static/styles/admin.css">
 <script defer src="/static/vendor/alpine.min.js"></script>
+{{GA_SNIPPET}}
 </head>
 <body x-data="app()" x-init="init()" data-page="admin">
 <main class="container-fluid">
@@ -28,7 +29,7 @@
       <ul>
         <li>
           <span x-show="defcon !== 2" class="theme-toggle" role="button" @click="simulate(simCount)" x-text="t('simulate')"></span>
-          <span x-show="defcon === 2" class="theme-toggle btn-danger" role="button" @click="clearAlertCities(); defcon = 5; _simulating = false; stopPositiveMessages(); updateMapMarkers(); fireConfetti()">Clear</span>
+          <span x-show="defcon === 2 && _simulating" class="theme-toggle btn-danger" role="button" @click="clearAlertCities(); defcon = 5; _simulating = false; stopPositiveMessages(); updateMapMarkers(); fireConfetti()">Clear</span>
         </li>
         <li><span class="locale-toggle" role="button" @click="toggleLocale()" x-text="locale === 'he' ? 'EN' : 'עב'"></span></li>
         <li><span class="theme-toggle" role="button" @click="toggleTheme()" x-text="darkMode ? '☀️' : '🌙'"></span></li>
@@ -234,7 +235,7 @@
                 <div style="display:flex;align-items:center;gap:6px">
                   <input type="number" x-model.number="simCount" min="1" max="1166" class="admin-num-input">
                   <button class="outline admin-action-btn" @click="simulate(simCount)">Go</button>
-                  <button class="outline admin-action-btn btn-danger" x-show="alertCityMarkers.length > 0" @click="clearAlertCities(); defcon = 5; _simulating = false; stopPositiveMessages(); updateMapMarkers(); fireConfetti()">Clear</button>
+                  <button class="outline admin-action-btn btn-danger" x-show="_simulating && alertCityMarkers.length > 0" @click="clearAlertCities(); defcon = 5; _simulating = false; stopPositiveMessages(); updateMapMarkers(); fireConfetti()">Clear</button>
                 </div>
               </div>
             </div>

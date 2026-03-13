@@ -90,20 +90,37 @@ def refresh_session(refresh_token):
 
 
 def is_authenticated(headers):
-    """Check Authorization header or admin_session cookie for a valid Descope session."""
+    """Check Authorization header or cookies for a valid Descope session.
+
+    Tries session token first, then auto-refreshes using the refresh token.
+    Returns (authed: bool, new_session_jwt: str|None).
+    new_session_jwt is set when a refresh occurred, so the caller can update the cookie.
+    """
     # Check Authorization: Bearer <token> header first
     auth = headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         token = auth[7:]
         if validate_session(token) is not None:
-            return True
+            return True, None
 
-    # Fall back to admin_session cookie
+    # Try admin_session cookie
     cookie_header = headers.get("Cookie", "")
+    session_token = None
+    refresh_token = None
     for part in cookie_header.split(";"):
         part = part.strip()
         if part.startswith("admin_session="):
-            token = part[len("admin_session=") :]
-            return validate_session(token) is not None
+            session_token = part[len("admin_session="):]
+        elif part.startswith("admin_refresh="):
+            refresh_token = part[len("admin_refresh="):]
 
-    return False
+    if session_token and validate_session(session_token) is not None:
+        return True, None
+
+    # Session expired — try refresh
+    if refresh_token:
+        new_session = refresh_session(refresh_token)
+        if new_session:
+            return True, new_session
+
+    return False, None

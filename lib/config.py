@@ -58,6 +58,8 @@ def load_admin_config():
     }
 
 
+GA_MEASUREMENT_ID = os.environ.get("GA_MEASUREMENT_ID", "")
+
 CHECK_INTERVAL = 3
 
 # Alert matching

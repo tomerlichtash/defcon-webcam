@@ -13,7 +13,7 @@ import sys
 
 sys.path.insert(0, _root)
 
-from lib.config import IS_LINUX, HAS_CAMERA
+from lib.config import IS_LINUX, HAS_CAMERA, GA_MEASUREMENT_ID
 from lib.auth import is_authenticated, validate_session, refresh_session, start_oauth, exchange_oauth
 from lib.sysinfo import get_sysinfo, get_defcon
 from lib.geocode import init_geo_db, random_cities, lookup_many, city_count
@@ -56,11 +56,19 @@ for _lang in ("en", "he"):
     except Exception:
         _quotes[_lang] = []
 
+_ga_snippet = ""
+if GA_MEASUREMENT_ID:
+    _ga_snippet = (
+        f'<script async src="https://www.googletagmanager.com/gtag/js?id={GA_MEASUREMENT_ID}"></script>'
+        f"<script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments)}}"
+        f"gtag('js',new Date());gtag('config','{GA_MEASUREMENT_ID}');</script>"
+    )
+
 with open(os.path.join(TEMPLATE_DIR, "index.html")) as f:
-    HTML_TEMPLATE = f.read()
+    HTML_TEMPLATE = f.read().replace("{{GA_SNIPPET}}", _ga_snippet)
 
 with open(os.path.join(TEMPLATE_DIR, "admin.html")) as f:
-    ADMIN_TEMPLATE = f.read()
+    ADMIN_TEMPLATE = f.read().replace("{{GA_SNIPPET}}", _ga_snippet)
 
 with open(os.path.join(TEMPLATE_DIR, "login.html")) as f:
     LOGIN_TEMPLATE = f.read()
@@ -162,12 +170,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return
 
             # --- All commands below require authentication ---
-            if not is_authenticated(self.headers):
+            authed, new_jwt = is_authenticated(self.headers)
+            if not authed:
                 self.send_response(401)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(b'{"error":"unauthorized"}')
                 return
+            self._pending_jwt = new_jwt
 
             if cmd == "simulate":
                 try:
@@ -331,12 +341,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json_response({"output": output})
 
         elif self.path.startswith("/admin/api"):
-            if not is_authenticated(self.headers):
+            authed, new_jwt = is_authenticated(self.headers)
+            if not authed:
                 self.send_response(401)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(b'{"error":"unauthorized"}')
                 return
+            self._pending_jwt = new_jwt
 
             query = urllib.parse.urlparse(self.path).query
             params = urllib.parse.parse_qs(query)
@@ -391,14 +403,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         elif self.path.startswith("/admin"):
             # Validate session cookie before serving admin page
-            token = self._session_cookie()
-            if not token or not validate_session(token):
+            authed, new_jwt = self._authenticate()
+            if not authed:
                 self.send_response(302)
                 self.send_header("Location", "/login")
                 self.end_headers()
                 return
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self._set_refreshed_cookie(new_jwt)
             self.end_headers()
             self.wfile.write(ADMIN_TEMPLATE.encode())
 
@@ -460,9 +473,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "js/channels.js",
                 "js/eventlog.js",
             }
+            _new_jwt = None
             if rel in _admin_only:
-                token = self._session_cookie()
-                if not token or not validate_session(token):
+                authed, _new_jwt = self._authenticate()
+                if not authed:
                     self.send_response(403)
                     self.end_headers()
                     return
@@ -484,6 +498,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "Content-Type", ctypes.get(ext, "application/octet-stream")
                 )
                 self.send_header("Cache-Control", "no-cache")
+                self._set_refreshed_cookie(_new_jwt)
                 self.end_headers()
                 with open(fpath, "rb") as f:
                     self.wfile.write(f.read())
@@ -578,10 +593,38 @@ class Handler(http.server.BaseHTTPRequestHandler):
         """Extract admin_session token from Cookie header."""
         return self._cookie("admin_session")
 
+    def _authenticate(self):
+        """Check session, auto-refresh if expired. Returns (authed, new_session_jwt|None)."""
+        token = self._session_cookie()
+        if token and validate_session(token):
+            return True, None
+        # Session expired or missing — try refresh token
+        refresh_token = self._cookie("admin_refresh")
+        if refresh_token:
+            new_session = refresh_session(refresh_token)
+            if new_session:
+                return True, new_session
+        return False, None
+
+    def _set_refreshed_cookie(self, new_jwt):
+        """Set updated session cookie on the response (call after send_response)."""
+        if new_jwt:
+            self.send_header(
+                "Set-Cookie",
+                f"admin_session={new_jwt}; Path=/; HttpOnly; SameSite=Lax",
+            )
+
     def _json_response(self, data):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", "*")
+        new_jwt = getattr(self, "_pending_jwt", None)
+        if new_jwt:
+            self.send_header(
+                "Set-Cookie",
+                f"admin_session={new_jwt}; Path=/; HttpOnly; SameSite=Lax",
+            )
+            self._pending_jwt = None
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
 

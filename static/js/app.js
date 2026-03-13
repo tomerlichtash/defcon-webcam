@@ -26,7 +26,7 @@ function app() {
     darkMode: localStorage.getItem("theme")
       ? localStorage.getItem("theme") === "dark"
       : window.matchMedia("(prefers-color-scheme: dark)").matches,
-    locale: localStorage.getItem("locale") || "en",
+    locale: localStorage.getItem("locale") || "he",
     noPolling: new URLSearchParams(location.search).get("polling") === "false",
     webRestarting: false,
     panels: Object.assign(

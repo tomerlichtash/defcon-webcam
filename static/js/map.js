@@ -16,9 +16,23 @@ var MapModule = {
     if (this.leafletMap) return;
     const mapEl = document.getElementById("leaflet-map");
     if (!mapEl) return;
+
+    /* Guard against Leaflet tooltip/marker crash when _map is null */
+    for (const Proto of [L.Tooltip.prototype, L.Marker.prototype, L.CircleMarker.prototype]) {
+      if (Proto._updatePosition) {
+        const orig = Proto._updatePosition;
+        Proto._updatePosition = function () { if (!this._map) return; orig.apply(this, arguments); };
+      }
+      if (Proto._animateZoom) {
+        const orig = Proto._animateZoom;
+        Proto._animateZoom = function () { if (!this._map) return; orig.apply(this, arguments); };
+      }
+    }
     const map = L.map("leaflet-map", {
       zoomControl: false,
       attributionControl: false,
+      zoomAnimation: true,
+      markerZoomAnimation: true,
     }).fitBounds([
       [29.557, 34.2],
       [33.28, 36.0],
@@ -53,6 +67,7 @@ var MapModule = {
     new RecenterControl().addTo(map);
 
     this.leafletMap = map;
+
     setTimeout(() => {
       map.invalidateSize();
     }, 200);
@@ -142,17 +157,16 @@ var MapModule = {
   recenterMap() {
     if (!this.leafletMap) return;
     if (this.userLocation && this.userCircle) {
-      this.leafletMap.flyToBounds(this.userCircle.getBounds(), {
+      this.leafletMap.fitBounds(this.userCircle.getBounds(), {
         padding: [30, 30],
-        duration: 1,
       });
     } else if (this.alertCityMarkers.length > 0) {
       const bounds = L.latLngBounds(
         this.alertCityMarkers.map((m) => m.getLatLng()),
       );
-      this.leafletMap.flyToBounds(bounds, { padding: [30, 30], duration: 1 });
+      this.leafletMap.fitBounds(bounds, { padding: [30, 30] });
     } else {
-      this.leafletMap.flyTo([31.5, 34.8], 8, { duration: 1 });
+      this.leafletMap.setView([31.5, 34.8], 8);
     }
   },
 
@@ -180,6 +194,7 @@ var MapModule = {
   clearAlertCities() {
     if (!this.leafletMap) return;
     this.alertCityMarkers.forEach((m) => {
+      if (m.getTooltip()) m.unbindTooltip();
       this.leafletMap.removeLayer(m);
     });
     this.alertCityMarkers = [];

@@ -166,6 +166,12 @@ nav > ul:last-child {
   height: 100vh;
 }
 
+/* Pico sets img{max-width:100%} which shrinks map tiles */
+#leaflet-map img {
+  max-width: none !important;
+  max-height: none !important;
+}
+
 /* Leaflet overrides — #leaflet-map ID specificity beats library class selectors */
 
 #leaflet-map {
